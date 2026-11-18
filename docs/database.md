@@ -1,0 +1,37 @@
+# SQLite storage
+
+## Location and lifecycle
+
+Hesab opens one SQLite database at startup and keeps the connection for the app session. On Windows, the file is stored at `%LOCALAPPDATA%/Hesab/hesab.sqlite3`, outside the repository and in local per-user app data. `sqflite_common_ffi` supplies the sqflite API backed by bundled SQLite for Windows desktop.
+
+The database is initialized by `HesabDatabase`. It enables and checks SQLite foreign-key enforcement on every opened connection. Version upgrades are append-only in `HesabMigrations`; the current schema version is 1. Never edit a migration that has shipped. Add a new numbered migration and raise `currentVersion` instead.
+
+## Version 1 schema
+
+The migration adapts the logical tables in `database schema.txt`:
+
+- `category`, `unit`, `item`, and `wallet` retain their parent/child relationships and add normalized names plus nullable `archived_at` timestamps.
+- Categories and units are unique by normalized name. Wallets are unique by normalized name. Items are unique by normalized name, category, and unit.
+- `wallet_transaction` stores a constrained transaction type and optional `reversal_of_transaction_id`. A reversal must point to an unreversed deposit, purchase, or withdrawal in the same wallet for the same amount. Reversals are unique per original transaction.
+- `expense.transaction_id` is unique, and triggers reject expenses attached to non-purchase transactions. Transactions and expense rows are immutable after insertion; corrections are represented with reversal rows.
+- `wallet_balances` computes each balance in integer minor units, including the inverse effect of a reversal. New wallets therefore have a zero balance without an opening-balance field.
+- Foreign keys use `ON DELETE RESTRICT` so referenced categories, units, items, wallets, and transactions must be archived instead of removed.
+
+The application has one currency (AFN), so currency is not repeated in each row. Dates are stored as ISO `YYYY-MM-DD` Gregorian dates; the UI converts them to the Afghan Jalali calendar for display.
+
+## Exact number representation
+
+- Money is stored as integer minor units: 100 minor units equal 1 AFN. The version 1 range matches the positive `DECIMAL(10,2)` range from the logical schema.
+- Quantity is stored as integer thousandths: 1,000 units equal quantity 1.000. The range matches positive `DECIMAL(10,3)` values from the logical schema.
+- Unit price is stored as integer minor units. The database does not use SQLite `REAL` for money.
+- For a purchase, calculate `quantity_milli × unit_price_minor` with arbitrary-precision integer arithmetic in the service layer. Divide by 1,000 and round to the nearest minor unit, with exact ties rounded away from zero (for positive purchases, half-up). For example, 1.234 × 12.50 AFN is 15.43 AFN. Validate the rounded result against the transaction amount before writing.
+
+SQLite cannot express a cross-table requirement that every purchase has at least one expense at commit time using the current transaction-first schema. The database enforces at most one expense per transaction and rejects expenses for other transaction types. `TransactionService.purchase` inserts the transaction and its one expense in the same database transaction so the pair commits or rolls back together. The service test verifies an insufficient-funds purchase creates neither record.
+
+## Dependencies
+
+- `sqflite_common_ffi`: Windows-compatible SQLite access using sqflite's database, transaction, and migration APIs; SQLite is bundled by the package's current 3.x native build hooks.
+
+## Known boundaries
+
+Repositories, local name normalization, validation, financial services, reversals, and database tests now sit above the migration layer. Report import/export and validated backup/restore remain future work. Transaction dates are accepted as Dart `DateTime` values and stored as ISO Gregorian calendar dates; dashboard period selection converts Afghan Jalali dates at the service boundary. Keep all SQL parameterized in repositories and never run SQL from widgets.

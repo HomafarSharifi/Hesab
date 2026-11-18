@@ -46,3 +46,44 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+
+# Private AI instructions and notes
+AGENTS.private.md
+AGENTS.*.private.md
+.ai/
+.agent/
+.private/
+.agents/
+.codex/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local databases and financial data
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.sqlite-wal
+*.sqlite-shm
+*.hesab
+/local-data/
+/backups/
+/exports/
+
+# Flutter and Dart generated files
+.dart_tool/
+.packages
+.pub/
+build/
+
+# IDE and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

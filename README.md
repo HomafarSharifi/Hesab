@@ -1,17 +1,29 @@
-# hesab
+# Hesab
 
-A new Flutter project.
+Hesab is a Dari-first financial management application for Windows desktop, built with Flutter and Dart. Its interface uses right-to-left Dari, the Jalali calendar with Afghan month names, and the supplied Yekan Bakh fonts in `asset/YekanBakh/`.
 
-## Getting Started
+## Product scope
 
-This project is a starting point for a Flutter application.
+Implemented workflows include local wallets, deposits and withdrawals, atomic purchases with matching expenses, purchase reversal, category/unit/item management, normalized Dari/Persian names, Jalali period reports, and real dashboard summaries/charts. Purchase entry supports selecting or creating a product, category, and unit within the atomic purchase workflow. All tabs share a responsive Jalali month/year/custom-range header; the custom range uses one dialog with start and end date pickers. The RTL shell supports compact and desktop navigation, and both light and dark themes use the supplied Yekan Bakh font. The piggy-bank mark is used in the app shell and Windows app icon. The application uses one currency, Afghan Afghani (AFN). Report import/export and versioned backup/restore remain planned.
 
-A few resources to get you started if this is your first Flutter project:
+Confirmed financial rules include zero-balance wallets funded by deposits; atomic purchases with exactly one matching expense; rejection of insufficient-funds purchases by default; and reversal workflows for correcting committed transactions. See [AGENTS.md](AGENTS.md) for the full project conventions and confirmed rules.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Technology
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Flutter and Dart
+- SQLite for local storage
+- Windows desktop as the initial target
+
+## Development status
+
+The repository includes the supplied dashboard reference (`UI refence.png`), logical schema (`database schema.txt`), and Yekan Bakh font assets. The application opens a local SQLite database and creates its version 1 schema. Financial records are immutable; corrections use reversal transactions. Purchase totals use arbitrary-precision integer arithmetic and round positive half-minor-unit ties up. See [docs/database.md](docs/database.md) for details.
+
+## Setup
+
+From the project directory, run `flutter pub get`, then `flutter build windows`. A Windows Release build has been verified with the Flutter SDK installed on this machine; the executable is written to `build/windows/x64/runner/Release/hesab.exe`.
+
+See [docs/database.md](docs/database.md) for the version 1 SQLite schema, exact-number rules, migration strategy, and current boundaries.
+
+## License
+
+No project license has been selected yet.
