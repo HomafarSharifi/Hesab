@@ -1,0 +1,72 @@
+CREATE SCHEMA IF NOT EXISTS `Hesab`
+  DEFAULT CHARACTER SET utf8mb4;
+
+USE `Hesab`;
+
+CREATE TABLE IF NOT EXISTS `category` (
+  `category_id` INT NOT NULL AUTO_INCREMENT,
+  `category_name` VARCHAR(45) NOT NULL,
+  PRIMARY KEY (`category_id`),
+  UNIQUE (`category_name`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `unit` (
+  `unit_id` INT NOT NULL AUTO_INCREMENT,
+  `unit_name` VARCHAR(30) NOT NULL,
+  PRIMARY KEY (`unit_id`),
+  UNIQUE (`unit_name`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `item` (
+  `item_id` INT NOT NULL AUTO_INCREMENT,
+  `item_name` VARCHAR(45) NOT NULL,
+  `category_id` INT NOT NULL,
+  `unit_id` INT NOT NULL,
+  PRIMARY KEY (`item_id`),
+  INDEX (`category_id`),
+  INDEX (`unit_id`),
+  CONSTRAINT `fk_item_category`
+    FOREIGN KEY (`category_id`)
+    REFERENCES `category` (`category_id`),
+  CONSTRAINT `fk_item_unit`
+    FOREIGN KEY (`unit_id`)
+    REFERENCES `unit` (`unit_id`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `wallet` (
+  `wallet_id` INT NOT NULL AUTO_INCREMENT,
+  `wallet_name` VARCHAR(45) NOT NULL,
+  PRIMARY KEY (`wallet_id`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `wallet_transaction` (
+  `transaction_id` INT NOT NULL AUTO_INCREMENT,
+  `wallet_id` INT NOT NULL,
+  `transaction_date` DATE NOT NULL,
+  `transaction_type` ENUM('deposit', 'purchase', 'withdrawal') NOT NULL,
+  `amount` DECIMAL(10,2) NOT NULL,
+  `note` TEXT NULL,
+  PRIMARY KEY (`transaction_id`),
+  INDEX (`wallet_id`),
+  CONSTRAINT `fk_transaction_wallet`
+    FOREIGN KEY (`wallet_id`)
+    REFERENCES `wallet` (`wallet_id`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `expense` (
+  `expense_id` INT NOT NULL AUTO_INCREMENT,
+  `transaction_id` INT NOT NULL,
+  `item_id` INT NOT NULL,
+  `quantity` DECIMAL(10,3) NOT NULL,
+  `unit_price` DECIMAL(10,2) NOT NULL,
+  `note` TEXT NULL,
+  PRIMARY KEY (`expense_id`),
+  UNIQUE (`transaction_id`),
+  INDEX (`item_id`),
+  CONSTRAINT `fk_expense_transaction`
+    FOREIGN KEY (`transaction_id`)
+    REFERENCES `wallet_transaction` (`transaction_id`),
+  CONSTRAINT `fk_expense_item`
+    FOREIGN KEY (`item_id`)
+    REFERENCES `item` (`item_id`)
+) ENGINE=InnoDB;
