@@ -44,7 +44,7 @@ class ExpenseRecord {
     required this.itemName,
     required this.categoryName,
     required this.unitName,
-    required this.quantityMilli,
+    required this.quantityCenti,
     required this.unitPriceMinor,
     required this.isReversed,
     this.note,
@@ -60,7 +60,7 @@ class ExpenseRecord {
   final String itemName;
   final String categoryName;
   final String unitName;
-  final int quantityMilli;
+  final int quantityCenti;
   final int unitPriceMinor;
   final bool isReversed;
   final String? note;
@@ -76,7 +76,7 @@ class ExpenseRecord {
     itemName: map['item_name']! as String,
     categoryName: map['category_name']! as String,
     unitName: map['unit_name']! as String,
-    quantityMilli: map['quantity_milli']! as int,
+    quantityCenti: map['quantity_centi']! as int,
     unitPriceMinor: map['unit_price_minor']! as int,
     isReversed: map['is_reversed'] == 1,
     note: map['note'] as String?,
@@ -91,6 +91,7 @@ class ReportSummary {
     required this.highestPurchaseMinor,
     required this.mostPurchasedItem,
     required this.expenseByCategory,
+    required this.purchaseCountByCategory,
     required this.expensesByMonth,
   });
 
@@ -100,5 +101,6 @@ class ReportSummary {
   final int? highestPurchaseMinor;
   final String? mostPurchasedItem;
   final Map<String, int> expenseByCategory;
+  final Map<String, int> purchaseCountByCategory;
   final Map<String, int> expensesByMonth;
 }

@@ -1,96 +1,812 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/calendar/jalali_date.dart';
 import '../../../core/finance/amount_codec.dart';
 import '../../../core/theme/hesab_theme.dart';
+import '../../../data/models/catalog_models.dart';
 
-class ExpenseTrendCard extends StatelessWidget {
-  const ExpenseTrendCard({required this.monthlyExpenses, super.key});
-  final Map<String, int> monthlyExpenses;
+class ItemExpenseTrendCard extends StatefulWidget {
+  const ItemExpenseTrendCard({
+    required this.items,
+    required this.loadMonthlyExpenses,
+    super.key,
+  });
+
+  final List<ItemRecord> items;
+  final Future<Map<String, int>> Function({
+    required int itemId,
+    required int jalaliYear,
+  })
+  loadMonthlyExpenses;
+
+  @override
+  State<ItemExpenseTrendCard> createState() => _ItemExpenseTrendCardState();
+}
+
+class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
+  int? _itemId;
+  int _year = JalaliDate.fromGregorian(DateTime.now()).year;
+  bool _yearView = false;
+  int? _hoveredIndex;
+  String? _requestedKey;
+  Future<Map<String, int>>? _chartFuture;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final selectedId = widget.items.any((item) => item.id == _itemId)
+        ? _itemId!
+        : widget.items.isEmpty
+        ? null
+        : widget.items.first.id;
+    final chartKey = '$selectedId-$_year-$_yearView';
+    if (selectedId != null && chartKey != _requestedKey) {
+      _requestedKey = chartKey;
+      _chartFuture = _yearView
+          ? _loadYearlyExpenses(selectedId)
+          : widget.loadMonthlyExpenses(itemId: selectedId, jalaliYear: _year);
+    }
+    final years = List<int>.generate(6, (i) => _year - i);
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(HesabTheme.cardRadius),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.bar_chart_rounded, color: colors.primary, size: 20),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  'مصارف جنس در ${_yearView ? 'سال‌ها' : 'ماه‌ها'}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<bool>(
+                    isExpanded: true,
+                    value: _yearView,
+                    items: const [
+                      DropdownMenuItem(value: false, child: Text('ماه‌ها')),
+                      DropdownMenuItem(value: true, child: Text('سال‌ها')),
+                    ],
+                    onChanged: (value) => setState(() {
+                      _yearView = value!;
+                      _hoveredIndex = null;
+                    }),
+                  ),
+                ),
+              ),
+              if (!_yearView) const SizedBox(width: 8),
+              if (!_yearView)
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      isExpanded: true,
+                      value: years.contains(_year) ? _year : years.first,
+                      items: [
+                        for (final year in years)
+                          DropdownMenuItem(
+                            value: year,
+                            child: Text(
+                              _chartDariDigits(year.toString()),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: (value) => setState(() {
+                        _year = value!;
+                        _hoveredIndex = null;
+                      }),
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    isExpanded: true,
+                    value: selectedId,
+                    hint: const Text('انتخاب جنس'),
+                    items: [
+                      for (final item in widget.items)
+                        DropdownMenuItem(
+                          value: item.id,
+                          child: Text(
+                            item.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) => setState(() {
+                      _itemId = value;
+                      _hoveredIndex = null;
+                    }),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Expanded(
+            child: selectedId == null
+                ? Center(
+                    child: Text(
+                      'برای نمایش نمودار، جنس ثبت کنید.',
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                    ),
+                  )
+                : FutureBuilder<Map<String, int>>(
+                    key: ValueKey('$selectedId-$_year-$_yearView'),
+                    future: _chartFuture,
+                    builder: (context, snapshot) {
+                      final chartYears = List<int>.generate(
+                        5,
+                        (i) => _year - 4 + i,
+                      );
+                      final labels = _yearView
+                          ? chartYears
+                                .map(
+                                  (year) => _chartDariDigits(year.toString()),
+                                )
+                                .toList()
+                          : afghanJalaliMonths;
+                      final values = _yearView
+                          ? List<int>.generate(
+                              5,
+                              (i) => snapshot.data?['${chartYears[i]}'] ?? 0,
+                            )
+                          : List<int>.generate(
+                              12,
+                              (i) =>
+                                  snapshot.data?[(i + 1).toString().padLeft(
+                                    2,
+                                    '0',
+                                  )] ??
+                                  0,
+                            );
+                      final peak = values.indexOf(
+                        values.reduce((a, b) => a > b ? a : b),
+                      );
+                      final active = (_hoveredIndex ?? peak)
+                          .clamp(0, values.length - 1)
+                          .toInt();
+                      return Column(
+                        children: [
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting)
+                            const LinearProgressIndicator(minHeight: 2),
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (context, box) => MouseRegion(
+                                onHover: (event) {
+                                  final slot = box.maxWidth / values.length;
+                                  final index = (event.localPosition.dx / slot)
+                                      .floor()
+                                      .clamp(0, values.length - 1)
+                                      .toInt();
+                                  if (_hoveredIndex != index) {
+                                    setState(() => _hoveredIndex = index);
+                                  }
+                                },
+                                onExit: (_) =>
+                                    setState(() => _hoveredIndex = null),
+                                child: CustomPaint(
+                                  size: Size(box.maxWidth, box.maxHeight),
+                                  painter: _ReferencePillBars(
+                                    values: values,
+                                    labels: labels,
+                                    activeIndex: active,
+                                    colors: colors,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<Map<String, int>> _loadYearlyExpenses(int itemId) async {
+    final chartYears = List<int>.generate(5, (i) => _year - 4 + i);
+    final annual = await Future.wait([
+      for (final year in chartYears)
+        widget.loadMonthlyExpenses(itemId: itemId, jalaliYear: year),
+    ]);
+    return {
+      for (var i = 0; i < chartYears.length; i++)
+        '${chartYears[i]}': annual[i].values.fold<int>(
+          0,
+          (sum, amount) => sum + amount,
+        ),
+    };
+  }
+}
+
+class _ReferencePillBars extends CustomPainter {
+  const _ReferencePillBars({
+    required this.values,
+    required this.labels,
+    required this.activeIndex,
+    required this.colors,
+  });
+  final List<int> values;
+  final List<String> labels;
+  final int activeIndex;
+  final ColorScheme colors;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0 || values.isEmpty) return;
+    const left = 36.0, right = 4.0, top = 20.0, bottom = 25.0;
+    final width = size.width - left - right,
+        height = size.height - top - bottom;
+    if (width <= 0 || height <= 0) return;
+    final maxValue = values.fold<int>(1, (a, b) => a > b ? a : b);
+    final max = _chartCeiling(maxValue);
+    for (var i = 0; i <= 4; i++) {
+      final y = top + height * (1 - i / 4);
+      final paint = Paint()
+        ..color = colors.outlineVariant.withValues(alpha: .7)
+        ..strokeWidth = 1;
+      for (var x = left; x < size.width - right; x += 8) {
+        canvas.drawLine(
+          Offset(x, y),
+          Offset(math.min(x + 4, size.width - right).toDouble(), y),
+          paint,
+        );
+      }
+      _barText(
+        canvas,
+        _compactChartAmount((max * i / 4).round()),
+        TextStyle(color: colors.onSurfaceVariant, fontSize: 9),
+        Offset(left - 3, y),
+        true,
+      );
+    }
+    final slot = width / values.length;
+    final barWidth = (slot * .52).clamp(7.0, 28.0).toDouble();
+    for (var i = 0; i < values.length; i++) {
+      final barHeight = height * (values[i] / max).clamp(0.0, 1.0).toDouble();
+      final cx = left + slot * (i + .5);
+      final rect = Rect.fromLTWH(
+        cx - barWidth / 2,
+        top + height - barHeight,
+        barWidth,
+        barHeight,
+      );
+      final radius = RRect.fromRectAndRadius(
+        rect,
+        Radius.circular(barWidth / 2),
+      );
+      canvas.drawRRect(
+        radius,
+        Paint()
+          ..color = i == activeIndex
+              ? colors.primary
+              : colors.primary.withValues(alpha: .34),
+      );
+      canvas.save();
+      canvas.clipRRect(radius);
+      for (var x = rect.left - barHeight; x < rect.right + barHeight; x += 7) {
+        canvas.drawLine(
+          Offset(x, rect.top),
+          Offset(x - barHeight * .55, rect.bottom),
+          Paint()
+            ..color = Colors.white.withValues(alpha: .22)
+            ..strokeWidth = 1.4,
+        );
+      }
+      canvas.restore();
+      if (i == activeIndex && values[i] > 0) {
+        final label = _barTextPainter(
+          AmountCodec.formatMoneyMinor(values[i]),
+          TextStyle(
+            color: colors.onPrimary,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+          ),
+        );
+        final bw = math.min(label.width + 12, size.width - 2);
+        final bx = (cx - bw / 2).clamp(1.0, size.width - bw - 1).toDouble();
+        final by = math.max(1.0, rect.top - label.height - 7);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(bx, by, bw, label.height + 5),
+            const Radius.circular(10),
+          ),
+          Paint()..color = colors.primary,
+        );
+        label.paint(canvas, Offset(bx + (bw - label.width) / 2, by + 2));
+      }
+      _barText(
+        canvas,
+        labels[i],
+        TextStyle(
+          color: i == activeIndex ? colors.onSurface : colors.onSurfaceVariant,
+          fontSize: 8,
+          fontWeight: i == activeIndex ? FontWeight.w700 : FontWeight.w400,
+        ),
+        Offset(cx, size.height - bottom + 4),
+        false,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ReferencePillBars old) =>
+      old.values != values ||
+      old.activeIndex != activeIndex ||
+      old.colors != colors;
+}
+
+int _chartCeiling(int value) {
+  if (value <= 100) return 100;
+  final magnitude = math.pow(10, (math.log(value) / math.ln10).floor()).toInt();
+  final normalized = value / magnitude;
+  final step = normalized <= 1.5
+      ? 1.5
+      : normalized <= 2
+      ? 2.0
+      : normalized <= 3
+      ? 3.0
+      : normalized <= 5
+      ? 5.0
+      : normalized <= 8
+      ? 8.0
+      : 10.0;
+  return (step * magnitude).ceil();
+}
+
+String _compactChartAmount(int minor) {
+  final value = minor ~/ 100;
+  final label = value >= 1000
+      ? '${(value / 1000).round()}هزار'
+      : value.toString();
+  return _chartDariDigits(label);
+}
+
+String _chartDariDigits(String value) => value.replaceAllMapped(
+  RegExp(r'[0-9]'),
+  (m) => '۰۱۲۳۴۵۶۷۸۹'[int.parse(m[0]!)],
+);
+TextPainter _barTextPainter(String text, TextStyle style) => TextPainter(
+  text: TextSpan(text: text, style: style),
+  textDirection: TextDirection.rtl,
+)..layout();
+void _barText(
+  Canvas canvas,
+  String text,
+  TextStyle style,
+  Offset point,
+  bool right,
+) {
+  final painter = _barTextPainter(text, style);
+  painter.paint(
+    canvas,
+    Offset(
+      right ? point.dx - painter.width : point.dx - painter.width / 2,
+      point.dy - painter.height / 2,
+    ),
+  );
+}
+
+class ExpenseTrendCard extends StatefulWidget {
+  const ExpenseTrendCard({required this.monthlyExpenses, super.key});
+  final Map<String, int> monthlyExpenses;
+
+  @override
+  State<ExpenseTrendCard> createState() => _ExpenseTrendCardState();
+}
+
+class _ExpenseTrendCardState extends State<ExpenseTrendCard> {
+  int? _hoveredIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final currentJalaliYear = JalaliDate.fromGregorian(DateTime.now()).year;
     final values = List<int>.generate(
       12,
       (index) =>
-          monthlyExpenses['$currentJalaliYear-${(index + 1).toString().padLeft(2, '0')}'] ??
+          widget
+              .monthlyExpenses['$currentJalaliYear-${(index + 1).toString().padLeft(2, '0')}'] ??
           0,
     );
+    final peak = values.indexOf(values.reduce((a, b) => a > b ? a : b));
+    final focusIndex = (_hoveredIndex ?? peak)
+        .clamp(0, values.length - 1)
+        .toInt();
     final hasData = values.any((value) => value > 0);
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(HesabTheme.cardRadius),
       ),
-      padding: EdgeInsetsDirectional.fromSTEB(
-        MediaQuery.sizeOf(context).width < 600 ? 14 : 20,
-        18,
-        MediaQuery.sizeOf(context).width < 600 ? 14 : 20,
-        16,
-      ),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'روند مصارف',
-            textAlign: TextAlign.right,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 18),
-          Expanded(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _ChartGridPainter(
-                      color: colors.outlineVariant.withValues(alpha: 0.58),
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.show_chart_rounded,
+                  size: 18,
+                  color: colors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'روند مصارف ماهانه',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'مقایسه مصارف ۱۲ ماه سال هجری شمسی',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colors.onSurfaceVariant,
+                        fontSize: 9,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (hasData)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.primary.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    '${afghanJalaliMonths[focusIndex]}: ${AmountCodec.formatMoneyMinor(values[focusIndex])}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.primary,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
-                if (hasData)
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _TrendPainter(
-                        values: values,
-                        color: Theme.of(context).colorScheme.primary,
+            ],
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: hasData
+                ? LayoutBuilder(
+                    builder: (context, constraints) => MouseRegion(
+                      onHover: (event) {
+                        const leftPad = 46.0, rightPad = 14.0;
+                        final step =
+                            (constraints.maxWidth - leftPad - rightPad) /
+                            (values.length - 1);
+                        final index =
+                            ((event.localPosition.dx - leftPad) / step)
+                                .round()
+                                .clamp(0, values.length - 1)
+                                .toInt();
+                        if (index != _hoveredIndex) {
+                          setState(() => _hoveredIndex = index);
+                        }
+                      },
+                      onExit: (_) => setState(() => _hoveredIndex = null),
+                      child: CustomPaint(
+                        size: Size(constraints.maxWidth, constraints.maxHeight),
+                        painter: _ReferenceMonthlyLinePainter(
+                          months: afghanJalaliMonths,
+                          values: values,
+                          activeIndex: focusIndex,
+                          border: colors.outlineVariant,
+                          muted: colors.onSurfaceVariant,
+                          primary: colors.primary,
+                          accent: colors.tertiary,
+                          surface: colors.surface,
+                        ),
                       ),
                     ),
                   )
-                else
-                  Center(
+                : Center(
                     child: Text(
                       'در این دوره مصرفی ثبت نشده است',
                       style: TextStyle(
                         color: colors.onSurfaceVariant,
-                        fontSize: HesabTheme.fontBody,
+                        fontSize: 10,
                       ),
                     ),
                   ),
-              ],
-            ),
           ),
-          const SizedBox(height: 16),
-          Directionality(
-            textDirection: TextDirection.ltr,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                for (final month in afghanJalaliMonths)
-                  Flexible(
-                    child: Text(
-                      month,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.clip,
+        ],
+      ),
+    );
+  }
+}
+
+class ReferenceCategoryBreakdownCard extends StatefulWidget {
+  const ReferenceCategoryBreakdownCard({
+    required this.categories,
+    required this.purchaseCounts,
+    required this.totalMinor,
+    super.key,
+  });
+
+  final Map<String, int> categories;
+  final Map<String, int> purchaseCounts;
+  final int totalMinor;
+
+  @override
+  State<ReferenceCategoryBreakdownCard> createState() =>
+      _ReferenceCategoryBreakdownCardState();
+}
+
+class _ReferenceCategoryBreakdownCardState
+    extends State<ReferenceCategoryBreakdownCard> {
+  int? _hoveredIndex;
+
+  int? _hitTest(Offset point, Size size, List<int> values, int total) {
+    if (values.isEmpty || total <= 0) return null;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.shortestSide / 2 - 14;
+    final stroke = radius * .25;
+    final distance = (point - center).distance;
+    if (distance < radius - stroke / 2 - 10 ||
+        distance > radius + stroke / 2 + 12) {
+      return null;
+    }
+    var angle =
+        math.atan2(point.dy - center.dy, point.dx - center.dx) + math.pi / 2;
+    if (angle < 0) angle += math.pi * 2;
+    var start = 0.0;
+    for (var index = 0; index < values.length; index++) {
+      final sweep = values[index] / total * math.pi * 2;
+      if (angle >= start && angle <= start + sweep) return index;
+      start += sweep;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final entries = widget.categories.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final values = entries.map((entry) => entry.value).toList();
+    final total = values.fold<int>(0, (sum, value) => sum + value);
+    final palette = <Color>[
+      const Color(0xFF66D82D),
+      colors.primary,
+      const Color(0xFF4E8ADF),
+      const Color(0xFFF0B942),
+      const Color(0xFFAB72C4),
+      const Color(0xFFE57C68),
+    ];
+    final largest = values.isEmpty
+        ? 0
+        : values.indexOf(values.reduce(math.max));
+    final activeIndex = _hoveredIndex != null && _hoveredIndex! < entries.length
+        ? _hoveredIndex!
+        : largest;
+    final active = entries.isEmpty ? null : entries[activeIndex];
+    final share = active == null || total == 0
+        ? 0.0
+        : active.value / total * 100;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(HesabTheme.cardRadius),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.donut_large_rounded, size: 19, color: colors.primary),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'مصارف براساس دسته‌بندی',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    Text(
+                      _hoveredIndex == null
+                          ? 'پیش‌فرض: بیشترین دسته مصرف'
+                          : 'جزئیات دسته انتخاب‌شده',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: HesabTheme.fontCaption,
-                        color: colors.onSurface,
+                        color: colors.onSurfaceVariant,
+                        fontSize: 9,
                       ),
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 5),
+              _CategoryShareBadge(
+                share: share,
+                color: active == null
+                    ? colors.primary
+                    : palette[activeIndex % palette.length],
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: Row(
+              textDirection: TextDirection.ltr,
+              children: [
+                Expanded(
+                  flex: 48,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final side = math.min(
+                        constraints.maxWidth,
+                        constraints.maxHeight,
+                      );
+                      return Center(
+                        child: MouseRegion(
+                          onHover: (event) {
+                            final next = _hitTest(
+                              event.localPosition,
+                              Size(side, side),
+                              values,
+                              total,
+                            );
+                            if (next != _hoveredIndex) {
+                              setState(() => _hoveredIndex = next);
+                            }
+                          },
+                          onExit: (_) => setState(() => _hoveredIndex = null),
+                          child: SizedBox(
+                            width: side,
+                            height: side,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                CustomPaint(
+                                  size: Size.square(side),
+                                  painter: _ReferenceDonutPainter(
+                                    values: values,
+                                    colors: palette,
+                                    trackColor: colors.surfaceContainerHighest,
+                                    activeIndex: activeIndex,
+                                  ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.all(side * .27),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        active?.key ?? 'مجموع مصارف',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: colors.onSurfaceVariant,
+                                          fontSize: 9,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          AmountCodec.formatMoneyMinor(
+                                            active?.value ?? widget.totalMinor,
+                                          ),
+                                          style: TextStyle(
+                                            color: colors.onSurface,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
+                                      if (active != null)
+                                        Text(
+                                          '${_chartDariDigits((widget.purchaseCounts[active.key] ?? 0).toString())} خرید',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color:
+                                                palette[activeIndex %
+                                                    palette.length],
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  flex: 52,
+                  child: entries.isEmpty
+                      ? Center(
+                          child: Text(
+                            'پس از ثبت مصارف، دسته‌ها این‌جا دیده می‌شوند.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: colors.onSurfaceVariant,
+                              fontSize: 9,
+                            ),
+                          ),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            for (
+                              var index = 0;
+                              index < math.min(entries.length, 4);
+                              index++
+                            )
+                              _ReferenceCategoryRow(
+                                name: entries[index].key,
+                                amount: entries[index].value,
+                                color: palette[index % palette.length],
+                                active: index == activeIndex,
+                                onHover: (hovering) => setState(
+                                  () => _hoveredIndex = hovering ? index : null,
+                                ),
+                              ),
+                          ],
+                        ),
+                ),
               ],
             ),
           ),
@@ -98,6 +814,169 @@ class ExpenseTrendCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CategoryShareBadge extends StatelessWidget {
+  const _CategoryShareBadge({required this.share, required this.color});
+  final double share;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: .13),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Text(
+      '${_chartDariDigits(share.toStringAsFixed(1))}٪',
+      style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w800),
+    ),
+  );
+}
+
+class _ReferenceCategoryRow extends StatelessWidget {
+  const _ReferenceCategoryRow({
+    required this.name,
+    required this.amount,
+    required this.color,
+    required this.active,
+    required this.onHover,
+  });
+  final String name;
+  final int amount;
+  final Color color;
+  final bool active;
+  final ValueChanged<bool> onHover;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    onEnter: (_) => onHover(true),
+    onExit: (_) => onHover(false),
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+      decoration: BoxDecoration(
+        color: active
+            ? Theme.of(context).colorScheme.surfaceContainerHighest
+                  .withValues(alpha: .55)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 12),
+            child: Text(
+              AmountCodec.formatMoneyMinor(amount),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 8,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ReferenceDonutPainter extends CustomPainter {
+  const _ReferenceDonutPainter({
+    required this.values,
+    required this.colors,
+    required this.trackColor,
+    required this.activeIndex,
+  });
+  final List<int> values;
+  final List<Color> colors;
+  final Color trackColor;
+  final int activeIndex;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final total = values.fold<int>(0, (sum, value) => sum + value);
+    if (size.shortestSide <= 0) return;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.shortestSide / 2 - 14;
+    if (radius <= 0) return;
+    final stroke = radius * .25;
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = trackColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke,
+    );
+    if (total <= 0) return;
+    final gap = values.length > 1 ? stroke / radius + .05 : 0.0;
+    var start = -math.pi / 2;
+    for (var i = 0; i < values.length; i++) {
+      final sweep = values[i] / total * math.pi * 2;
+      final active = i == activeIndex;
+      final effectiveGap = math.min(gap, sweep * .65);
+      final visibleSweep = math.max(.02, sweep - effectiveGap);
+      final arcRadius = active ? radius + 3.5 : radius;
+      if (active) {
+        canvas.drawArc(
+          Rect.fromCircle(center: center, radius: arcRadius),
+          start + effectiveGap / 2,
+          visibleSweep,
+          false,
+          Paint()
+            ..color = colors[i % colors.length].withValues(alpha: .3)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = stroke + 9
+            ..strokeCap = StrokeCap.round
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+        );
+      }
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: arcRadius),
+        start + effectiveGap / 2,
+        visibleSweep,
+        false,
+        Paint()
+          ..color = colors[i % colors.length]
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = active ? stroke + 3 : stroke
+          ..strokeCap = StrokeCap.round,
+      );
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ReferenceDonutPainter old) =>
+      old.values != values ||
+      old.colors != colors ||
+      old.trackColor != trackColor ||
+      old.activeIndex != activeIndex;
 }
 
 class CategoryBreakdownCard extends StatelessWidget {
@@ -257,62 +1136,194 @@ class _CategoryLegend extends StatelessWidget {
   );
 }
 
-class _ChartGridPainter extends CustomPainter {
-  const _ChartGridPainter({required this.color});
-  final Color color;
+class _ReferenceMonthlyLinePainter extends CustomPainter {
+  const _ReferenceMonthlyLinePainter({
+    required this.months,
+    required this.values,
+    required this.activeIndex,
+    required this.border,
+    required this.muted,
+    required this.primary,
+    required this.accent,
+    required this.surface,
+  });
+
+  final List<String> months;
+  final List<int> values;
+  final int activeIndex;
+  final Color border;
+  final Color muted;
+  final Color primary;
+  final Color accent;
+  final Color surface;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
+    if (values.length < 2) return;
+    const leftPad = 46.0, rightPad = 14.0, topPad = 22.0, bottomPad = 25.0;
+    final chartWidth = size.width - leftPad - rightPad;
+    final chartHeight = size.height - topPad - bottomPad;
+    if (chartWidth <= 0 || chartHeight <= 0) return;
+    final rawMax = values.reduce((a, b) => a > b ? a : b);
+    final maxValue = _chartCeiling(math.max(rawMax, 1));
+    final gridPaint = Paint()
+      ..color = border.withValues(alpha: .7)
       ..strokeWidth = 1;
-    for (var i = 0; i < 5; i++) {
-      final y = size.height * i / 4;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    for (var i = 0; i <= 4; i++) {
+      final ratio = i / 4;
+      final y = topPad + chartHeight * (1 - ratio);
+      _drawReferenceDashedLine(
+        canvas,
+        Offset(leftPad, y),
+        Offset(size.width - rightPad, y),
+        gridPaint,
+      );
+      _referenceChartText(
+        canvas,
+        _compactChartAmount((maxValue * ratio).round()),
+        TextStyle(color: muted, fontSize: 9),
+        rightOfX: leftPad - 6,
+        centerY: y,
+      );
+    }
+    final stepX = chartWidth / (values.length - 1);
+    final points = [
+      for (var i = 0; i < values.length; i++)
+        Offset(
+          leftPad + stepX * i,
+          topPad + chartHeight * (1 - (values[i] / maxValue).clamp(0.0, 1.0)),
+        ),
+    ];
+    final line = Path()..moveTo(points.first.dx, points.first.dy);
+    for (var i = 0; i < points.length - 1; i++) {
+      final midX = (points[i].dx + points[i + 1].dx) / 2;
+      line.cubicTo(
+        midX,
+        points[i].dy,
+        midX,
+        points[i + 1].dy,
+        points[i + 1].dx,
+        points[i + 1].dy,
+      );
+    }
+    final fill = Path.from(line)
+      ..lineTo(points.last.dx, topPad + chartHeight)
+      ..lineTo(points.first.dx, topPad + chartHeight)
+      ..close();
+    canvas.drawPath(
+      fill,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(0, topPad),
+          Offset(0, topPad + chartHeight),
+          [
+            primary.withValues(alpha: .28),
+            accent.withValues(alpha: .07),
+            primary.withValues(alpha: 0),
+          ],
+          const [0, .65, 1],
+        ),
+    );
+    canvas.drawPath(
+      line,
+      Paint()
+        ..color = primary
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.8
+        ..strokeCap = StrokeCap.round,
+    );
+    final focus = points[activeIndex.clamp(0, points.length - 1)];
+    _drawReferenceDashedLine(
+      canvas,
+      Offset(focus.dx, topPad),
+      Offset(focus.dx, topPad + chartHeight),
+      Paint()
+        ..color = primary.withValues(alpha: .4)
+        ..strokeWidth = 1.2,
+    );
+    canvas.drawCircle(
+      focus,
+      7,
+      Paint()..color = primary.withValues(alpha: .22),
+    );
+    canvas.drawCircle(focus, 4.5, Paint()..color = surface);
+    canvas.drawCircle(
+      focus,
+      4.5,
+      Paint()
+        ..color = primary
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5,
+    );
+    for (var i = 0; i < months.length; i++) {
+      final focused = i == activeIndex;
+      _referenceChartText(
+        canvas,
+        months[i],
+        TextStyle(
+          color: focused ? primary : muted,
+          fontSize: 9,
+          fontWeight: focused ? FontWeight.w800 : FontWeight.w500,
+        ),
+        centerX: points[i].dx,
+        topY: topPad + chartHeight + 5,
+      );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _ChartGridPainter oldDelegate) =>
-      oldDelegate.color != color;
+  bool shouldRepaint(covariant _ReferenceMonthlyLinePainter old) =>
+      old.values != values ||
+      old.activeIndex != activeIndex ||
+      old.border != border ||
+      old.muted != muted ||
+      old.primary != primary ||
+      old.accent != accent ||
+      old.surface != surface;
 }
 
-class _TrendPainter extends CustomPainter {
-  const _TrendPainter({required this.values, required this.color});
-  final List<int> values;
-  final Color color;
+TextPainter _referenceChartTextPainter(String text, TextStyle style) =>
+    TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.rtl,
+    )..layout();
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final maxValue = values.fold<int>(0, math.max).toDouble();
-    if (maxValue <= 0) return;
-    final path = Path();
-    for (var index = 0; index < values.length; index++) {
-      final x = size.width * index / (values.length - 1);
-      final y =
-          size.height -
-          (values[index] / maxValue) * size.height * 0.84 -
-          size.height * 0.08;
-      if (index == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = color
-        ..strokeWidth = 3
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..style = PaintingStyle.stroke,
+void _referenceChartText(
+  Canvas canvas,
+  String text,
+  TextStyle style, {
+  double? centerX,
+  double? rightOfX,
+  double? topY,
+  double? centerY,
+}) {
+  final painter = _referenceChartTextPainter(text, style);
+  final dx = centerX != null
+      ? centerX - painter.width / 2
+      : rightOfX! - painter.width;
+  final dy = centerY != null ? centerY - painter.height / 2 : topY!;
+  painter.paint(canvas, Offset(dx, dy));
+}
+
+void _drawReferenceDashedLine(
+  Canvas canvas,
+  Offset start,
+  Offset end,
+  Paint paint,
+) {
+  const dash = 4.0, gap = 4.0;
+  final dx = end.dx - start.dx, dy = end.dy - start.dy;
+  final distance = math.sqrt(dx * dx + dy * dy);
+  if (distance == 0) return;
+  final unitX = dx / distance, unitY = dy / distance;
+  for (var offset = 0.0; offset < distance; offset += dash + gap) {
+    final stop = math.min(offset + dash, distance);
+    canvas.drawLine(
+      Offset(start.dx + unitX * offset, start.dy + unitY * offset),
+      Offset(start.dx + unitX * stop, start.dy + unitY * stop),
+      paint,
     );
   }
-
-  @override
-  bool shouldRepaint(covariant _TrendPainter oldDelegate) =>
-      oldDelegate.values != values || oldDelegate.color != color;
 }
 
 class _CategoryRingPainter extends CustomPainter {
@@ -353,12 +1364,13 @@ class _CategoryRingPainter extends CustomPainter {
       return;
     }
     var start = -math.pi / 2;
+    final gap = values.length > 1 ? 0.055 : 0.0;
     for (var index = 0; index < values.length; index++) {
       final sweep = math.pi * 2 * values[index] / total;
       canvas.drawArc(
         rect,
-        start,
-        sweep,
+        start + math.min(gap / 2, sweep * .3),
+        math.max(.02, sweep - math.min(gap, sweep * .6)),
         false,
         Paint()
           ..color = colors[index % colors.length]

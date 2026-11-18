@@ -39,7 +39,7 @@ void main() {
         walletId: 1,
         itemId: 1,
         date: DateTime(2026, 11, 18),
-        quantityMilli: 1250,
+        quantityCenti: 125,
         unitPriceMinor: 200,
       );
 
@@ -56,7 +56,7 @@ void main() {
           walletId: 1,
           itemId: 1,
           date: DateTime(2026, 11, 18),
-          quantityMilli: 100000,
+          quantityCenti: 1000,
           unitPriceMinor: 100,
         ),
         throwsA(isA<AppFailure>()),
@@ -85,7 +85,7 @@ void main() {
           newCategoryName: 'نوشیدنی',
           newUnitName: 'بسته',
           date: DateTime(2026, 11, 20),
-          quantityMilli: 1000,
+          quantityCenti: 100,
           unitPriceMinor: 6000,
         ),
         throwsA(isA<AppFailure>()),
@@ -100,7 +100,7 @@ void main() {
         newCategoryName: 'نوشیدنی',
         newUnitName: 'بسته',
         date: DateTime(2026, 11, 20),
-        quantityMilli: 1000,
+        quantityCenti: 100,
         unitPriceMinor: 1000,
       );
       expect(await database.query('category'), hasLength(2));
@@ -113,7 +113,7 @@ void main() {
         categoryId: 1,
         unitId: 1,
         date: DateTime(2026, 11, 21),
-        quantityMilli: 1000,
+        quantityCenti: 100,
         unitPriceMinor: 100,
       );
       expect(await database.query('item'), hasLength(2));

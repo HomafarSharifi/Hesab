@@ -85,8 +85,7 @@ class _ReportContent extends StatelessWidget {
                   for (final entry in categories)
                     _ReportRow(
                       label: entry.key,
-                      value:
-                          '${AmountCodec.formatMoneyMinor(entry.value)} افغانی',
+                      value: AmountCodec.formatMoneyMinor(entry.value),
                     ),
                 ],
               );
@@ -97,8 +96,7 @@ class _ReportContent extends StatelessWidget {
                   for (final entry in months)
                     _ReportRow(
                       label: entry.key,
-                      value:
-                          '${AmountCodec.formatMoneyMinor(entry.value)} افغانی',
+                      value: AmountCodec.formatMoneyMinor(entry.value),
                     ),
                 ],
               );

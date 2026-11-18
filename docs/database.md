@@ -4,9 +4,9 @@
 
 Hesab opens one SQLite database at startup and keeps the connection for the app session. On Windows, the file is stored at `%LOCALAPPDATA%/Hesab/hesab.sqlite3`, outside the repository and in local per-user app data. `sqflite_common_ffi` supplies the sqflite API backed by bundled SQLite for Windows desktop.
 
-The database is initialized by `HesabDatabase`. It enables and checks SQLite foreign-key enforcement on every opened connection. Version upgrades are append-only in `HesabMigrations`; the current schema version is 1. Never edit a migration that has shipped. Add a new numbered migration and raise `currentVersion` instead.
+The database is initialized by `HesabDatabase`. It enables and checks SQLite foreign-key enforcement on every opened connection. Version upgrades are append-only in `HesabMigrations`; the current schema version is 2. Never edit a migration that has shipped. Add a new numbered migration and raise `currentVersion` instead.
 
-## Version 1 schema
+## Version 1 schema and later changes
 
 The migration adapts the logical tables in `database schema.txt`:
 
@@ -22,9 +22,9 @@ The application has one currency (AFN), so currency is not repeated in each row.
 ## Exact number representation
 
 - Money is stored as integer minor units: 100 minor units equal 1 AFN. The version 1 range matches the positive `DECIMAL(10,2)` range from the logical schema.
-- Quantity is stored as integer thousandths: 1,000 units equal quantity 1.000. The range matches positive `DECIMAL(10,3)` values from the logical schema.
+- Quantity is stored as integer hundredths: 100 units equal quantity 1.00. The v2 migration converts prior thousandths to hundredths using nearest rounding, with positive ties rounded up.
 - Unit price is stored as integer minor units. The database does not use SQLite `REAL` for money.
-- For a purchase, calculate `quantity_milli × unit_price_minor` with arbitrary-precision integer arithmetic in the service layer. Divide by 1,000 and round to the nearest minor unit, with exact ties rounded away from zero (for positive purchases, half-up). For example, 1.234 × 12.50 AFN is 15.43 AFN. Validate the rounded result against the transaction amount before writing.
+- For a purchase, calculate `quantity_centi × unit_price_minor` with arbitrary-precision integer arithmetic in the service layer. Divide by 100 and round to the nearest minor unit, with exact ties rounded away from zero (for positive purchases, half-up). For example, 1.25 × 12.50 AFN is 15.63 AFN. Validate the rounded result against the transaction amount before writing.
 
 SQLite cannot express a cross-table requirement that every purchase has at least one expense at commit time using the current transaction-first schema. The database enforces at most one expense per transaction and rejects expenses for other transaction types. `TransactionService.purchase` inserts the transaction and its one expense in the same database transaction so the pair commits or rolls back together. The service test verifies an insufficient-funds purchase creates neither record.
 

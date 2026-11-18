@@ -16,7 +16,7 @@
 - Wallets start at zero; initial funds are deposits.
 - Every purchase has exactly one expense. Deposits and withdrawals have no expense records.
 - Save purchase and expense atomically. Reject purchases that exceed the wallet balance by default.
-- Quantity has three decimal places. Money has two decimal places. Purchases use arbitrary-precision integer arithmetic; positive half-minor-unit ties round up (half-up), as documented in `docs/database.md`.
+- Quantity and money have two decimal places. Display whole numbers without a decimal part and trim insignificant trailing zeros. Purchases use arbitrary-precision integer arithmetic; positive half-minor-unit ties round up (half-up), as documented in `docs/database.md`.
 - Category and unit names are unique. Wallet names are unique after normalization. Item uniqueness is normalized name + category + unit.
 - Archive referenced records rather than hard-deleting them. Correct committed transactions through a documented reversal workflow.
 - Support local Dari/Persian text normalization, search, fuzzy suggestions, and duplicate prevention without cloud AI.

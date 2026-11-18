@@ -16,7 +16,7 @@ Confirmed financial rules include zero-balance wallets funded by deposits; atomi
 
 ## Development status
 
-The repository includes the supplied dashboard reference (`UI refence.png`), logical schema (`database schema.txt`), and Yekan Bakh font assets. The application opens a local SQLite database and creates its version 1 schema. Financial records are immutable; corrections use reversal transactions. Purchase totals use arbitrary-precision integer arithmetic and round positive half-minor-unit ties up. See [docs/database.md](docs/database.md) for details.
+The repository includes the supplied dashboard reference (`UI refence.png`), logical schema (`database schema.txt`), and Yekan Bakh font assets. The application opens a local SQLite database and creates its version 2 schema; the v2 migration converts stored quantities to two decimal places. Financial records are immutable; corrections use reversal transactions. Purchase totals use arbitrary-precision integer arithmetic and round positive half-minor-unit ties up. See [docs/database.md](docs/database.md) for details.
 
 ## Setup
 

@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../../app/hesab_services.dart';
+import '../../../data/models/catalog_models.dart';
 import '../../../data/models/financial_models.dart';
 import '../widgets/dashboard_cards.dart';
 import '../widgets/dashboard_charts.dart';
@@ -39,6 +42,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       fromDate: widget.fromDate,
       toDate: widget.toDate,
     );
+    final items = await widget.services.catalog.items();
     return _DashboardData(
       balanceMinor: wallets.fold<int>(
         0,
@@ -47,122 +51,96 @@ class _DashboardScreenState extends State<DashboardScreen> {
       spentMinor: report.totalExpenseMinor,
       receivedMinor: report.totalReceivedMinor,
       report: report,
+      items: items,
     );
   }
 
   Widget _buildWithData(BuildContext context, _DashboardData? data) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 600;
-        final horizontalPadding = (constraints.maxWidth * 0.035)
-            .clamp(12.0, 48.0)
-            .toDouble();
-        final summaryHeight = (constraints.maxHeight * 0.285)
-            .clamp(220.0, 370.0)
-            .toDouble();
-        final chartHeight = (constraints.maxHeight * 0.36)
-            .clamp(270.0, 470.0)
-            .toDouble();
-        final contentWidth = constraints.maxWidth - horizontalPadding * 2;
-        final sideBySideSummary = contentWidth >= 850;
-        final sideBySideCharts = contentWidth >= 1000;
+        // The design canvas preserves the reference proportions. FittedBox
+        // scales that canvas to the shell's available window without scrolling.
+        final stageWidth = math.max(constraints.maxWidth, 1040.0);
+        final stageHeight = math.max(constraints.maxHeight, 560.0);
 
         return Directionality(
           textDirection: TextDirection.rtl,
-          child: SingleChildScrollView(
-            padding: EdgeInsetsDirectional.fromSTEB(
-              horizontalPadding,
-              compact ? 14 : 20,
-              horizontalPadding,
-              compact ? 20 : 28,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(height: compact ? 10 : 18),
-                if (sideBySideSummary)
-                  SizedBox(
-                    height: summaryHeight,
-                    child: Row(
-                      textDirection: TextDirection.ltr,
-                      children: [
-                        Expanded(
-                          flex: 44,
-                          child: WalletSummaryCard(
-                            onAddFunds: widget.onAddFunds,
-                            balanceMinor: data?.balanceMinor,
-                            spentMinor: data?.spentMinor,
-                            receivedMinor: data?.receivedMinor,
-                          ),
+          child: ClipRect(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                width: stageWidth,
+                height: stageHeight,
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        flex: 48,
+                        child: Row(
+                          textDirection: TextDirection.ltr,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              flex: 37,
+                              child: WalletSummaryCard(
+                                onAddFunds: widget.onAddFunds,
+                                balanceMinor: data?.balanceMinor,
+                                spentMinor: data?.spentMinor,
+                                receivedMinor: data?.receivedMinor,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              flex: 63,
+                              child: ItemExpenseTrendCard(
+                                items: data?.items ?? const [],
+                                loadMonthlyExpenses:
+                                    widget.services.reports.itemExpensesByMonth,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          flex: 56,
-                          child: ExpenseSummaryCard(summary: data?.report),
+                      ),
+                      const SizedBox(height: 14),
+                      Expanded(
+                        flex: 52,
+                        child: Row(
+                          textDirection: TextDirection.ltr,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              flex: 40,
+                              child: ExpenseTrendCard(
+                                monthlyExpenses:
+                                    data?.report.expensesByMonth ?? const {},
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              flex: 32,
+                              child: ReferenceCategoryBreakdownCard(
+                                categories:
+                                    data?.report.expenseByCategory ?? const {},
+                                purchaseCounts:
+                                    data?.report.purchaseCountByCategory ??
+                                    const {},
+                                totalMinor: data?.report.totalExpenseMinor ?? 0,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              flex: 28,
+                              child: ExpenseSummaryCard(summary: data?.report),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  )
-                else ...[
-                  SizedBox(
-                    height: summaryHeight,
-                    child: WalletSummaryCard(
-                      onAddFunds: widget.onAddFunds,
-                      balanceMinor: data?.balanceMinor,
-                      spentMinor: data?.spentMinor,
-                      receivedMinor: data?.receivedMinor,
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 22),
-                  SizedBox(
-                    height: summaryHeight,
-                    child: ExpenseSummaryCard(summary: data?.report),
-                  ),
-                ],
-                SizedBox(height: compact ? 18 : 24),
-                if (sideBySideCharts)
-                  SizedBox(
-                    height: chartHeight,
-                    child: Row(
-                      textDirection: TextDirection.ltr,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          flex: 68,
-                          child: ExpenseTrendCard(
-                            monthlyExpenses:
-                                data?.report.expensesByMonth ?? const {},
-                          ),
-                        ),
-                        const SizedBox(width: 18),
-                        Expanded(
-                          flex: 32,
-                          child: CategoryBreakdownCard(
-                            categories:
-                                data?.report.expenseByCategory ?? const {},
-                            totalMinor: data?.report.totalExpenseMinor ?? 0,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else ...[
-                  SizedBox(
-                    height: chartHeight,
-                    child: ExpenseTrendCard(
-                      monthlyExpenses: data?.report.expensesByMonth ?? const {},
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  SizedBox(
-                    height: chartHeight,
-                    child: CategoryBreakdownCard(
-                      categories: data?.report.expenseByCategory ?? const {},
-                      totalMinor: data?.report.totalExpenseMinor ?? 0,
-                    ),
-                  ),
-                ],
-              ],
+                ),
+              ),
             ),
           ),
         );
@@ -177,10 +155,12 @@ class _DashboardData {
     required this.spentMinor,
     required this.receivedMinor,
     required this.report,
+    required this.items,
   });
 
   final int balanceMinor;
   final int spentMinor;
   final int receivedMinor;
   final ReportSummary report;
+  final List<ItemRecord> items;
 }

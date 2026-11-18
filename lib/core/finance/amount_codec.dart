@@ -4,7 +4,7 @@ class AmountCodec {
   const AmountCodec._();
 
   static const int maximumMinorUnits = 9999999999;
-  static const int maximumQuantityMilli = 99999999999;
+  static const int maximumQuantityCenti = 10000000000;
 
   static int parseMoneyMinor(String input) {
     final value = _asciiDigits(input)
@@ -25,23 +25,23 @@ class AmountCodec {
     return minor.toInt();
   }
 
-  static int parseQuantityMilli(String input) {
+  static int parseQuantityCenti(String input) {
     final value = _asciiDigits(input)
         .replaceAll(',', '')
         .replaceAll('٬', '')
         .replaceAll('٫', '.');
-    if (!RegExp(r'^\d+(?:\.\d{0,3})?$').hasMatch(value)) {
-      throw const AppFailure('مقدار را با حداکثر سه رقم اعشار وارد کنید.');
+    if (!RegExp(r'^\d+(?:\.\d{0,2})?$').hasMatch(value)) {
+      throw const AppFailure('مقدار را با حداکثر دو رقم اعشار وارد کنید.');
     }
     final parts = value.split('.');
     final whole = BigInt.parse(parts[0]);
     final fraction = parts.length == 1 ? '' : parts[1];
-    final milli =
-        whole * BigInt.from(1000) + BigInt.parse(fraction.padRight(3, '0'));
-    if (milli <= BigInt.zero || milli > BigInt.from(maximumQuantityMilli)) {
+    final centi =
+        whole * BigInt.from(100) + BigInt.parse(fraction.padRight(2, '0'));
+    if (centi <= BigInt.zero || centi > BigInt.from(maximumQuantityCenti)) {
       throw const AppFailure('مقدار باید بیشتر از صفر و در محدوده مجاز باشد.');
     }
-    return milli.toInt();
+    return centi.toInt();
   }
 
   static String formatMoneyMinor(int minor) {
@@ -49,28 +49,34 @@ class AmountCodec {
     final whole = value ~/ BigInt.from(100);
     final fraction = (value % BigInt.from(100)).toString().padLeft(2, '0');
     final grouped = _groupDigits(whole.toString());
-    return '${minor < 0 ? '−' : ''}$grouped.$fraction';
+    final decimal = fraction == '00'
+        ? ''
+        : '.${fraction.replaceFirst(RegExp(r'0$'), '')}';
+    return '${minor < 0 ? '−' : ''}$grouped$decimal ؋';
   }
 
-  static String formatQuantityMilli(int milli) {
-    final value = BigInt.from(milli).abs();
-    final whole = value ~/ BigInt.from(1000);
-    final fraction = (value % BigInt.from(1000)).toString().padLeft(3, '0');
-    return '${milli < 0 ? '−' : ''}${_groupDigits(whole.toString())}.$fraction';
+  static String formatQuantityCenti(int centi) {
+    final value = BigInt.from(centi).abs();
+    final whole = value ~/ BigInt.from(100);
+    final fraction = (value % BigInt.from(100)).toString().padLeft(2, '0');
+    final decimal = fraction == '00'
+        ? ''
+        : '.${fraction.replaceFirst(RegExp(r'0$'), '')}';
+    return '${centi < 0 ? '−' : ''}${_groupDigits(whole.toString())}$decimal';
   }
 
   static int calculatePurchaseTotalMinor({
-    required int quantityMilli,
+    required int quantityCenti,
     required int unitPriceMinor,
   }) {
-    if (quantityMilli <= 0 || quantityMilli > maximumQuantityMilli) {
+    if (quantityCenti <= 0 || quantityCenti > maximumQuantityCenti) {
       throw const AppFailure('مقدار باید بیشتر از صفر و در محدوده مجاز باشد.');
     }
     if (unitPriceMinor <= 0 || unitPriceMinor > maximumMinorUnits) {
       throw const AppFailure('قیمت باید بیشتر از صفر و در محدوده مجاز باشد.');
     }
-    final product = BigInt.from(quantityMilli) * BigInt.from(unitPriceMinor);
-    final total = (product + BigInt.from(500)) ~/ BigInt.from(1000);
+    final product = BigInt.from(quantityCenti) * BigInt.from(unitPriceMinor);
+    final total = (product + BigInt.from(50)) ~/ BigInt.from(100);
     if (total <= BigInt.zero || total > BigInt.from(maximumMinorUnits)) {
       throw const AppFailure('مجموع خرید در محدوده مجاز نیست.');
     }

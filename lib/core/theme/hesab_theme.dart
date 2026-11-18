@@ -1,14 +1,14 @@
 import 'package:material_ui/material_ui.dart';
 
 abstract final class HesabTheme {
-  static const double fontCaption = 12;
-  static const double fontBody = 14;
-  static const double fontControl = 15;
-  static const double fontSection = 19;
-  static const double fontPageTitle = 34;
-  static const double fontAmount = 38;
-  static const double controlHeight = 44;
-  static const double sidebarActionHeight = 50;
+  static const double fontCaption = 11;
+  static const double fontBody = 13;
+  static const double fontControl = 14;
+  static const double fontSection = 17;
+  static const double fontPageTitle = 28;
+  static const double fontAmount = 32;
+  static const double controlHeight = 40;
+  static const double sidebarActionHeight = 44;
   static const double cardRadius = 24;
   static const teal = Color(0xFF198372);
   static const paleTeal = Color(0xFFE0EEEC);
@@ -64,7 +64,7 @@ abstract final class HesabTheme {
               fontSize: fontSection,
             ),
             headlineMedium: base.textTheme.headlineMedium?.copyWith(
-              fontSize: 32,
+              fontSize: 28,
             ),
             headlineLarge: base.textTheme.headlineLarge?.copyWith(
               fontSize: fontPageTitle,
@@ -100,10 +100,9 @@ abstract final class HesabTheme {
         behavior: SnackBarBehavior.floating,
       ),
       cardTheme: CardThemeData(
-        color: brightness == Brightness.dark
-            ? const Color(0xFF202624)
-            : Colors.white,
+        color: base.colorScheme.surface,
         surfaceTintColor: Colors.transparent,
+        elevation: 0,
         margin: const EdgeInsets.all(0),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(cardRadius),

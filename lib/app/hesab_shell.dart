@@ -285,15 +285,15 @@ class _Sidebar extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   color: colors.surface,
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(22),
                 ),
                 padding: compact
                     ? const EdgeInsetsDirectional.fromSTEB(16, 14, 16, 14)
-                    : const EdgeInsetsDirectional.fromSTEB(20, 24, 20, 20),
+                    : const EdgeInsetsDirectional.fromSTEB(16, 18, 16, 16),
                 child: Column(
                   children: [
                     _HesabMark(compact: compact),
-                    SizedBox(height: compact ? 12 : 26),
+                    SizedBox(height: compact ? 10 : 18),
                     SizedBox(
                       width: double.infinity,
                       height: compact ? 48 : HesabTheme.sidebarActionHeight,
@@ -316,7 +316,7 @@ class _Sidebar extends StatelessWidget {
                             horizontal: compact ? 6 : 16,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(14),
                           ),
                         ),
                       ),
@@ -358,13 +358,9 @@ class _HesabMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: compact ? 48 : 62,
-    height: compact ? 48 : 62,
-    child: Icon(
-      Icons.savings_rounded,
-      size: compact ? 38 : 50,
-      color: Theme.of(context).colorScheme.primary,
-    ),
+    width: compact ? 42 : 50,
+    height: compact ? 42 : 50,
+    child: Image.asset('asset/piggy_bank.png'),
   );
 }
 

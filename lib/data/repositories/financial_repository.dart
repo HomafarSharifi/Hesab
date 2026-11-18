@@ -38,13 +38,13 @@ class FinancialRepository {
   Future<int> insertExpense({
     required int transactionId,
     required int itemId,
-    required int quantityMilli,
+    required int quantityCenti,
     required int unitPriceMinor,
     String? note,
   }) => _database.insert('expense', {
     'transaction_id': transactionId,
     'item_id': itemId,
-    'quantity_milli': quantityMilli,
+    'quantity_centi': quantityCenti,
     'unit_price_minor': unitPriceMinor,
     'note': note,
   });
@@ -145,7 +145,7 @@ class FinancialRepository {
       '''
       SELECT e.expense_id, e.transaction_id, t.wallet_id, w.wallet_name,
              t.transaction_date, t.amount_minor, e.item_id, i.item_name,
-             c.category_name, u.unit_name, e.quantity_milli,
+             c.category_name, u.unit_name, e.quantity_centi,
              e.unit_price_minor, e.note,
              CASE WHEN EXISTS (
                SELECT 1 FROM wallet_transaction reversal

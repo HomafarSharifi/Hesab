@@ -133,7 +133,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'موجودی: ${AmountCodec.formatMoneyMinor(wallet.balanceMinor)} افغانی',
+                                    'موجودی: ${AmountCodec.formatMoneyMinor(wallet.balanceMinor)}',
                                     style: const TextStyle(
                                       fontSize: HesabTheme.fontBody,
                                     ),
@@ -267,7 +267,8 @@ class _WalletAmountDialogState extends State<_WalletAmountDialog> {
       autofocus: true,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       decoration: const InputDecoration(
-        labelText: 'مبلغ به افغانی',
+        labelText: 'مبلغ',
+        suffixText: '؋',
         border: OutlineInputBorder(),
       ),
     ),

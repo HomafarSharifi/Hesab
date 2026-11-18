@@ -14,9 +14,11 @@ class HesabApp extends StatefulWidget {
 }
 
 class _HesabAppState extends State<HesabApp> {
-  bool _darkMode = false;
+  ThemeMode? _themeMode;
 
-  void _toggleTheme() => setState(() => _darkMode = !_darkMode);
+  void _toggleTheme(bool isDarkMode) => setState(
+    () => _themeMode = isDarkMode ? ThemeMode.light : ThemeMode.dark,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -28,15 +30,20 @@ class _HesabAppState extends State<HesabApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: HesabTheme.light,
       darkTheme: HesabTheme.dark,
-      themeMode: _darkMode ? ThemeMode.dark : ThemeMode.light,
+      themeMode: _themeMode ?? ThemeMode.system,
       builder: (context, child) => Directionality(
         textDirection: TextDirection.rtl,
         child: child ?? const SizedBox.shrink(),
       ),
-      home: HesabShell(
-        services: widget.services,
-        onToggleTheme: _toggleTheme,
-        isDarkMode: _darkMode,
+      home: Builder(
+        builder: (context) {
+          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+          return HesabShell(
+            services: widget.services,
+            onToggleTheme: () => _toggleTheme(isDarkMode),
+            isDarkMode: isDarkMode,
+          );
+        },
       ),
     );
   }

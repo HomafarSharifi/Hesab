@@ -3,7 +3,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 /// Schema changes are append-only. Increment [currentVersion] and add a
 /// migration case whenever the persisted schema changes.
 abstract final class HesabMigrations {
-  static const currentVersion = 1;
+  static const currentVersion = 2;
 
   static Future<void> onCreate(Database database, int version) =>
       migrate(database, fromVersion: 0, toVersion: version);
@@ -27,6 +27,9 @@ abstract final class HesabMigrations {
       switch (version) {
         case 1:
           await _createVersion1(database);
+          break;
+        case 2:
+          await _migrateVersion2(database);
           break;
         default:
           throw StateError('No Hesab database migration exists for v$version.');
@@ -234,6 +237,82 @@ abstract final class HesabMigrations {
       LEFT JOIN wallet_transaction AS original
         ON original.transaction_id = wallet_transaction.reversal_of_transaction_id
       GROUP BY wallet.wallet_id
+    ''');
+  }
+
+  /// Converts the persisted quantity from thousandths to hundredths. Legacy
+  /// values are rounded to the nearest hundredth using positive half-up.
+  static Future<void> _migrateVersion2(DatabaseExecutor database) async {
+    await database.execute('DROP TRIGGER expense_immutable_update');
+    await database.execute('DROP TRIGGER expense_immutable_delete');
+    await database.execute('''
+      CREATE TABLE expense_v2 (
+        expense_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transaction_id INTEGER NOT NULL UNIQUE,
+        item_id INTEGER NOT NULL,
+        quantity_centi INTEGER NOT NULL
+          CHECK(quantity_centi BETWEEN 1 AND 10000000000),
+        unit_price_minor INTEGER NOT NULL
+          CHECK(unit_price_minor BETWEEN 1 AND 9999999999),
+        note TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        FOREIGN KEY(transaction_id)
+          REFERENCES wallet_transaction(transaction_id) ON DELETE RESTRICT,
+        FOREIGN KEY(item_id) REFERENCES item(item_id) ON DELETE RESTRICT
+      )
+    ''');
+    await database.execute('''
+      INSERT INTO expense_v2 (
+        expense_id, transaction_id, item_id, quantity_centi,
+        unit_price_minor, note, created_at
+      )
+      SELECT expense_id, transaction_id, item_id,
+             CAST((quantity_milli + 5) / 10 AS INTEGER),
+             unit_price_minor, note, created_at
+      FROM expense
+    ''');
+    await database.execute('DROP TABLE expense');
+    await database.execute('ALTER TABLE expense_v2 RENAME TO expense');
+    await database.execute(
+      'CREATE INDEX expense_item_id_idx ON expense(item_id)',
+    );
+    await database.execute('''
+      CREATE TRIGGER expense_requires_purchase_insert
+      BEFORE INSERT ON expense
+      WHEN COALESCE(
+        (SELECT transaction_type FROM wallet_transaction
+         WHERE transaction_id = NEW.transaction_id),
+        ''
+      ) <> 'purchase'
+      BEGIN
+        SELECT RAISE(ABORT, 'expense_requires_purchase');
+      END
+    ''');
+    await database.execute('''
+      CREATE TRIGGER expense_requires_purchase_update
+      BEFORE UPDATE OF transaction_id ON expense
+      WHEN COALESCE(
+        (SELECT transaction_type FROM wallet_transaction
+         WHERE transaction_id = NEW.transaction_id),
+        ''
+      ) <> 'purchase'
+      BEGIN
+        SELECT RAISE(ABORT, 'expense_requires_purchase');
+      END
+    ''');
+    await database.execute('''
+      CREATE TRIGGER expense_immutable_update
+      BEFORE UPDATE ON expense
+      BEGIN
+        SELECT RAISE(ABORT, 'financial_expense_is_immutable');
+      END
+    ''');
+    await database.execute('''
+      CREATE TRIGGER expense_immutable_delete
+      BEFORE DELETE ON expense
+      BEGIN
+        SELECT RAISE(ABORT, 'financial_expense_is_immutable');
+      END
     ''');
   }
 }

@@ -42,12 +42,12 @@ class TransactionService {
     required int walletId,
     required int itemId,
     required DateTime date,
-    required int quantityMilli,
+    required int quantityCenti,
     required int unitPriceMinor,
     String? note,
   }) async {
     final totalMinor = AmountCodec.calculatePurchaseTotalMinor(
-      quantityMilli: quantityMilli,
+      quantityCenti: quantityCenti,
       unitPriceMinor: unitPriceMinor,
     );
     return _database.transaction(
@@ -56,7 +56,7 @@ class TransactionService {
         walletId: walletId,
         itemId: itemId,
         date: date,
-        quantityMilli: quantityMilli,
+        quantityCenti: quantityCenti,
         unitPriceMinor: unitPriceMinor,
         totalMinor: totalMinor,
         note: note,
@@ -68,7 +68,7 @@ class TransactionService {
     required int walletId,
     required String productName,
     required DateTime date,
-    required int quantityMilli,
+    required int quantityCenti,
     required int unitPriceMinor,
     int? categoryId,
     String? newCategoryName,
@@ -79,7 +79,7 @@ class TransactionService {
     final name = _validateName(productName, 45, 'نام جنس');
     final normalizedName = NameNormalizer.normalize(name);
     final totalMinor = AmountCodec.calculatePurchaseTotalMinor(
-      quantityMilli: quantityMilli,
+      quantityCenti: quantityCenti,
       unitPriceMinor: unitPriceMinor,
     );
 
@@ -130,7 +130,7 @@ class TransactionService {
         walletId: walletId,
         itemId: resolvedItemId,
         date: date,
-        quantityMilli: quantityMilli,
+        quantityCenti: quantityCenti,
         unitPriceMinor: unitPriceMinor,
         totalMinor: totalMinor,
         note: note,
@@ -143,7 +143,7 @@ class TransactionService {
     required int walletId,
     required int itemId,
     required DateTime date,
-    required int quantityMilli,
+    required int quantityCenti,
     required int unitPriceMinor,
     required int totalMinor,
     String? note,
@@ -170,7 +170,7 @@ class TransactionService {
     await financial.insertExpense(
       transactionId: transactionId,
       itemId: itemId,
-      quantityMilli: quantityMilli,
+      quantityCenti: quantityCenti,
       unitPriceMinor: unitPriceMinor,
       note: cleanNote,
     );

@@ -8,6 +8,40 @@ class ReportService {
 
   final Database _database;
 
+  Future<Map<String, int>> itemExpensesByMonth({
+    required int itemId,
+    required int jalaliYear,
+  }) async {
+    final rows = await _database.rawQuery(
+      '''
+      SELECT t.transaction_date, t.amount_minor
+      FROM wallet_transaction t
+      JOIN expense e ON e.transaction_id = t.transaction_id
+      WHERE e.item_id = ?
+        AND t.transaction_type = 'purchase'
+        AND NOT EXISTS (
+          SELECT 1 FROM wallet_transaction reversal
+          WHERE reversal.reversal_of_transaction_id = t.transaction_id
+        )
+    ''',
+      [itemId],
+    );
+    final totals = <String, int>{};
+    for (final row in rows) {
+      final jalali = JalaliDate.fromGregorian(
+        DateTime.parse(row['transaction_date']! as String),
+      );
+      if (jalali.year != jalaliYear) continue;
+      final key = jalali.month.toString().padLeft(2, '0');
+      totals.update(
+        key,
+        (value) => value + (row['amount_minor']! as int),
+        ifAbsent: () => row['amount_minor']! as int,
+      );
+    }
+    return totals;
+  }
+
   Future<ReportSummary> summary({DateTime? fromDate, DateTime? toDate}) async {
     final clauses = <String>[
       "t.transaction_type = 'purchase'",
@@ -51,7 +85,8 @@ class ReportService {
       ],
     );
     final categoryRows = await _database.rawQuery('''
-      SELECT c.category_name, COALESCE(SUM(t.amount_minor), 0) AS total_minor
+      SELECT c.category_name, COALESCE(SUM(t.amount_minor), 0) AS total_minor,
+             COUNT(*) AS purchase_count
       FROM wallet_transaction t
       JOIN expense e ON e.transaction_id = t.transaction_id
       JOIN item i ON i.item_id = e.item_id
@@ -102,6 +137,10 @@ class ReportService {
       expenseByCategory: {
         for (final row in categoryRows)
           row['category_name']! as String: row['total_minor']! as int,
+      },
+      purchaseCountByCategory: {
+        for (final row in categoryRows)
+          row['category_name']! as String: row['purchase_count']! as int,
       },
       expensesByMonth: monthlyTotals,
     );
