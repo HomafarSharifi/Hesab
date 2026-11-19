@@ -83,6 +83,29 @@ class ExpenseRecord {
   );
 }
 
+class ExpensePageResult {
+  const ExpensePageResult({
+    required this.records,
+    required this.totalCount,
+    required this.pageIndex,
+    required this.pageSize,
+  });
+
+  static const defaultPageSize = 50;
+
+  final List<ExpenseRecord> records;
+  final int totalCount;
+  final int pageIndex;
+  final int pageSize;
+
+  int get pageCount => (totalCount + pageSize - 1) ~/ pageSize;
+
+  int get firstRowNumber => records.isEmpty ? 0 : pageIndex * pageSize + 1;
+
+  int get lastRowNumber =>
+      records.isEmpty ? 0 : pageIndex * pageSize + records.length;
+}
+
 class ReportSummary {
   const ReportSummary({
     required this.totalExpenseMinor,

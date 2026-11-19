@@ -119,6 +119,128 @@ class FinancialRepository {
     int limit = 500,
     int offset = 0,
   }) async {
+    final filter = _expenseFilter(
+      normalizedSearch: normalizedSearch,
+      walletId: walletId,
+      categoryName: categoryName,
+      fromDate: fromDate,
+      toDate: toDate,
+    );
+    final rows = await _database.rawQuery(
+      '''
+      SELECT e.expense_id, e.transaction_id, t.wallet_id, w.wallet_name,
+             t.transaction_date, t.amount_minor, e.item_id, i.item_name,
+             c.category_name, u.unit_name, e.quantity_centi,
+             e.unit_price_minor, e.note,
+             CASE WHEN EXISTS (
+               SELECT 1 FROM wallet_transaction reversal
+               WHERE reversal.reversal_of_transaction_id = t.transaction_id
+             ) THEN 1 ELSE 0 END AS is_reversed
+      FROM expense e
+      JOIN wallet_transaction t ON t.transaction_id = e.transaction_id
+      JOIN wallet w ON w.wallet_id = t.wallet_id
+      JOIN item i ON i.item_id = e.item_id
+      JOIN category c ON c.category_id = i.category_id
+      JOIN unit u ON u.unit_id = i.unit_id
+      WHERE ${filter.where}
+      ORDER BY t.transaction_date DESC, t.transaction_id DESC
+      LIMIT ? OFFSET ?
+      ''',
+      [...filter.arguments, limit, offset],
+    );
+    return rows.map(ExpenseRecord.fromMap).toList();
+  }
+
+  Future<ExpensePageResult> expensesPage({
+    String? normalizedSearch,
+    int? walletId,
+    String? categoryName,
+    String? fromDate,
+    String? toDate,
+    required int pageIndex,
+    int pageSize = ExpensePageResult.defaultPageSize,
+  }) async {
+    if (pageIndex < 0 || pageSize <= 0) {
+      throw ArgumentError('Expense page index and size must be valid.');
+    }
+    final filter = _expenseFilter(
+      normalizedSearch: normalizedSearch,
+      walletId: walletId,
+      categoryName: categoryName,
+      fromDate: fromDate,
+      toDate: toDate,
+    );
+    final countRows = await _database.rawQuery('''
+      SELECT COUNT(*) AS total_count
+      FROM expense e
+      JOIN wallet_transaction t ON t.transaction_id = e.transaction_id
+      JOIN item i ON i.item_id = e.item_id
+      JOIN category c ON c.category_id = i.category_id
+      WHERE ${filter.where}
+      ''', filter.arguments);
+    final totalCount = countRows.single['total_count']! as int;
+    final rows = await _database.rawQuery(
+      '''
+      SELECT e.expense_id, e.transaction_id, t.wallet_id, w.wallet_name,
+             t.transaction_date, t.amount_minor, e.item_id, i.item_name,
+             c.category_name, u.unit_name, e.quantity_centi,
+             e.unit_price_minor, e.note,
+             CASE WHEN EXISTS (
+               SELECT 1 FROM wallet_transaction reversal
+               WHERE reversal.reversal_of_transaction_id = t.transaction_id
+             ) THEN 1 ELSE 0 END AS is_reversed
+      FROM expense e
+      JOIN wallet_transaction t ON t.transaction_id = e.transaction_id
+      JOIN wallet w ON w.wallet_id = t.wallet_id
+      JOIN item i ON i.item_id = e.item_id
+      JOIN category c ON c.category_id = i.category_id
+      JOIN unit u ON u.unit_id = i.unit_id
+      WHERE ${filter.where}
+      ORDER BY t.transaction_date DESC, t.transaction_id DESC
+      LIMIT ? OFFSET ?
+      ''',
+      [...filter.arguments, pageSize, pageIndex * pageSize],
+    );
+    return ExpensePageResult(
+      records: rows.map(ExpenseRecord.fromMap).toList(),
+      totalCount: totalCount,
+      pageIndex: pageIndex,
+      pageSize: pageSize,
+    );
+  }
+
+  Future<int> countExpenses({
+    String? normalizedSearch,
+    int? walletId,
+    String? categoryName,
+    String? fromDate,
+    String? toDate,
+  }) async {
+    final filter = _expenseFilter(
+      normalizedSearch: normalizedSearch,
+      walletId: walletId,
+      categoryName: categoryName,
+      fromDate: fromDate,
+      toDate: toDate,
+    );
+    final rows = await _database.rawQuery('''
+      SELECT COUNT(*) AS total_count
+      FROM expense e
+      JOIN wallet_transaction t ON t.transaction_id = e.transaction_id
+      JOIN item i ON i.item_id = e.item_id
+      JOIN category c ON c.category_id = i.category_id
+      WHERE ${filter.where}
+      ''', filter.arguments);
+    return rows.single['total_count']! as int;
+  }
+
+  ({String where, List<Object?> arguments}) _expenseFilter({
+    String? normalizedSearch,
+    int? walletId,
+    String? categoryName,
+    String? fromDate,
+    String? toDate,
+  }) {
     final clauses = <String>["t.transaction_type = 'purchase'"];
     final arguments = <Object?>[];
     if (normalizedSearch != null && normalizedSearch.isNotEmpty) {
@@ -141,28 +263,6 @@ class FinancialRepository {
       clauses.add('t.transaction_date <= ?');
       arguments.add(toDate);
     }
-    final rows = await _database.rawQuery(
-      '''
-      SELECT e.expense_id, e.transaction_id, t.wallet_id, w.wallet_name,
-             t.transaction_date, t.amount_minor, e.item_id, i.item_name,
-             c.category_name, u.unit_name, e.quantity_centi,
-             e.unit_price_minor, e.note,
-             CASE WHEN EXISTS (
-               SELECT 1 FROM wallet_transaction reversal
-               WHERE reversal.reversal_of_transaction_id = t.transaction_id
-             ) THEN 1 ELSE 0 END AS is_reversed
-      FROM expense e
-      JOIN wallet_transaction t ON t.transaction_id = e.transaction_id
-      JOIN wallet w ON w.wallet_id = t.wallet_id
-      JOIN item i ON i.item_id = e.item_id
-      JOIN category c ON c.category_id = i.category_id
-      JOIN unit u ON u.unit_id = i.unit_id
-      WHERE ${clauses.join(' AND ')}
-      ORDER BY t.transaction_date DESC, t.transaction_id DESC
-      LIMIT ? OFFSET ?
-      ''',
-      [...arguments, limit, offset],
-    );
-    return rows.map(ExpenseRecord.fromMap).toList();
+    return (where: clauses.join(' AND '), arguments: arguments);
   }
 }

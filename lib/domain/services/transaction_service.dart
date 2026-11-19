@@ -290,6 +290,42 @@ class TransactionService {
     offset: offset,
   );
 
+  Future<ExpensePageResult> expensesPage({
+    String? normalizedSearch,
+    int? walletId,
+    String? categoryName,
+    DateTime? fromDate,
+    DateTime? toDate,
+    required int pageIndex,
+    int pageSize = ExpensePageResult.defaultPageSize,
+  }) => FinancialRepository(_database).expensesPage(
+    normalizedSearch: normalizedSearch == null
+        ? null
+        : NameNormalizer.normalize(normalizedSearch),
+    walletId: walletId,
+    categoryName: categoryName,
+    fromDate: fromDate == null ? null : _dateOnly(fromDate),
+    toDate: toDate == null ? null : _dateOnly(toDate),
+    pageIndex: pageIndex,
+    pageSize: pageSize,
+  );
+
+  Future<int> countExpenses({
+    String? normalizedSearch,
+    int? walletId,
+    String? categoryName,
+    DateTime? fromDate,
+    DateTime? toDate,
+  }) => FinancialRepository(_database).countExpenses(
+    normalizedSearch: normalizedSearch == null
+        ? null
+        : NameNormalizer.normalize(normalizedSearch),
+    walletId: walletId,
+    categoryName: categoryName,
+    fromDate: fromDate == null ? null : _dateOnly(fromDate),
+    toDate: toDate == null ? null : _dateOnly(toDate),
+  );
+
   Future<int> _recordSimpleTransaction({
     required int walletId,
     required DateTime date,

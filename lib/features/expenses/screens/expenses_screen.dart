@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../../app/hesab_services.dart';
 import '../../../core/calendar/jalali_date.dart';
@@ -7,6 +8,8 @@ import '../../../core/text/name_normalizer.dart';
 import '../../../core/theme/hesab_theme.dart';
 import '../../../data/models/catalog_models.dart';
 import '../../../data/models/financial_models.dart';
+import '../services/expense_excel_exporter.dart';
+import '../widgets/expense_export_dialog.dart';
 import '../../shared/widgets/jalali_date_picker_dialog.dart';
 
 class ExpensesScreen extends StatefulWidget {
@@ -29,13 +32,25 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   final _searchController = TextEditingController();
   String _search = '';
   int? _walletFilter;
+  String? _walletFilterLabel;
   String? _categoryFilter;
   int _revision = 0;
+  int _pageIndex = 0;
+  final _excelExporter = ExpenseExcelExporter();
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant ExpensesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.fromDate != widget.fromDate ||
+        oldWidget.toDate != widget.toDate) {
+      _pageIndex = 0;
+    }
   }
 
   Future<void> _newPurchase() async {
@@ -79,14 +94,98 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
   }
 
-  Future<List<ExpenseRecord>> _loadExpenses() =>
-      widget.services.transactions.expenses(
+  Future<ExpensePageResult> _loadExpenses() =>
+      widget.services.transactions.expensesPage(
+        normalizedSearch: _search,
+        walletId: _walletFilter,
+        categoryName: _categoryFilter,
+        fromDate: widget.fromDate,
+        toDate: widget.toDate,
+        pageIndex: _pageIndex,
+      );
+
+  Future<int> _countFilteredExpenses() =>
+      widget.services.transactions.countExpenses(
         normalizedSearch: _search,
         walletId: _walletFilter,
         categoryName: _categoryFilter,
         fromDate: widget.fromDate,
         toDate: widget.toDate,
       );
+
+  String _exportFilterSummary() {
+    final filters = <String>[
+      'تاریخ: ${JalaliDate.fromGregorian(widget.fromDate).fullDate}'
+          '${widget.toDate == null ? ' به بعد' : ' تا ${JalaliDate.fromGregorian(widget.toDate!).fullDate}'}',
+      if (_search.trim().isNotEmpty) 'جستجو: ${_search.trim()}',
+      'دسته‌بندی: ${_categoryFilter ?? 'همه'}',
+      'کیف پول: ${_walletFilterLabel ?? 'همه'}',
+    ];
+    return filters.join('؛ ');
+  }
+
+  Future<void> _showExportDialog() async {
+    try {
+      final totalCount = await _countFilteredExpenses();
+      if (!mounted) return;
+      final selection = await showDialog<ExpenseExportSelection>(
+        context: context,
+        builder: (_) => ExpenseExportDialog(
+          totalCount: totalCount,
+          pageSize: ExpensePageResult.defaultPageSize,
+          filterSummary: _exportFilterSummary(),
+          search: _search.trim().isEmpty ? null : _search,
+          categoryName: _categoryFilter,
+          walletId: _walletFilter,
+          fromDate: widget.fromDate,
+          toDate: widget.toDate,
+          refreshTotalCount: _countFilteredExpenses,
+        ),
+      );
+      if (selection == null || !mounted) return;
+      if (selection.format != ExpenseExportFormat.excel) {
+        _message('برآمدن CSV در مرحله بعدی فعال می‌شود.');
+        return;
+      }
+
+      final recordsByPage = <int, List<ExpenseRecord>>{};
+      for (final pageIndex in selection.pageIndexes) {
+        final page = await widget.services.transactions.expensesPage(
+          normalizedSearch: selection.search,
+          walletId: selection.walletId,
+          categoryName: selection.categoryName,
+          fromDate: selection.fromDate,
+          toDate: selection.toDate,
+          pageIndex: pageIndex,
+          pageSize: selection.pageSize,
+        );
+        if (page.totalCount != selection.expectedTotalCount) {
+          throw StateError('معلومات مصارف تغییر کرده است؛ دوباره تلاش کنید.');
+        }
+        recordsByPage[pageIndex] = page.records;
+      }
+
+      final bytes = _excelExporter.buildWorkbook(
+        selection: selection,
+        recordsByPage: recordsByPage,
+      );
+      if (!mounted) return;
+      final savedPath = await FilePicker.platform.saveFile(
+        fileName: 'hesab_expenses.xlsx',
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+        bytes: bytes,
+      );
+      if (savedPath != null && mounted) _message('فایل اکسل ذخیره شد.');
+    } catch (error) {
+      _message(
+        error
+            .toString()
+            .replaceFirst('Exception: ', '')
+            .replaceFirst('Bad state: ', ''),
+      );
+    }
+  }
 
   Future<void> _showFilters() async {
     try {
@@ -108,6 +207,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       setState(() {
         _categoryFilter = result.categoryName;
         _walletFilter = result.walletId;
+        _walletFilterLabel = result.walletName;
+        _pageIndex = 0;
       });
     } catch (error) {
       _message(error.toString().replaceFirst('Exception: ', ''));
@@ -216,7 +317,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   height: HesabTheme.controlHeight,
                   child: TextField(
                     controller: _searchController,
-                    onChanged: (value) => setState(() => _search = value),
+                    onChanged: (value) => setState(() {
+                      _search = value;
+                      _pageIndex = 0;
+                    }),
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: IconButton(
@@ -239,14 +343,20 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 icon: const Icon(Icons.add_rounded, size: 20),
                 label: const Text('ثبت خرید'),
               ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _showExportDialog,
+                icon: const Icon(Icons.file_download_outlined, size: 18),
+                label: const Text('برآمدن'),
+              ),
             ],
           ),
           const SizedBox(height: 14),
           Expanded(
-            child: FutureBuilder<List<ExpenseRecord>>(
+            child: FutureBuilder<ExpensePageResult>(
               key: ValueKey(
                 '$_revision-$_search-$_categoryFilter-$_walletFilter-'
-                '${widget.fromDate}-${widget.toDate}',
+                '${widget.fromDate}-${widget.toDate}-$_pageIndex',
               ),
               future: _loadExpenses(),
               builder: (context, snapshot) {
@@ -260,7 +370,18 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     ),
                   );
                 }
-                final expenses = snapshot.data ?? const <ExpenseRecord>[];
+                final page = snapshot.data!;
+                final lastPageIndex = page.pageCount == 0
+                    ? 0
+                    : page.pageCount - 1;
+                if (_pageIndex > lastPageIndex) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted || _pageIndex <= lastPageIndex) return;
+                    setState(() => _pageIndex = lastPageIndex);
+                  });
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final expenses = page.records;
                 if (expenses.isEmpty) {
                   return Center(
                     child: Column(
@@ -291,9 +412,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 }
                 return _ExpensesTable(
                   expenses: expenses,
+                  pageIndex: page.pageIndex,
+                  pageSize: page.pageSize,
+                  pageCount: page.pageCount,
+                  totalCount: page.totalCount,
                   dateLabel: _dateLabel,
                   onDetails: _showDetails,
                   onReverse: _reverse,
+                  onPreviousPage: () => setState(() => _pageIndex--),
+                  onNextPage: () => setState(() => _pageIndex++),
                 );
               },
             ),
@@ -305,10 +432,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 }
 
 class _ExpenseFilters {
-  const _ExpenseFilters({this.categoryName, this.walletId});
+  const _ExpenseFilters({this.categoryName, this.walletId, this.walletName});
 
   final String? categoryName;
   final int? walletId;
+  final String? walletName;
 }
 
 class _ExpenseFilterDialog extends StatefulWidget {
@@ -393,6 +521,11 @@ class _ExpenseFilterDialogState extends State<_ExpenseFilterDialog> {
           _ExpenseFilters(
             categoryName: _categoryName.isEmpty ? null : _categoryName,
             walletId: _walletId == 0 ? null : _walletId,
+            walletName: _walletId == 0
+                ? null
+                : widget.wallets
+                      .firstWhere((wallet) => wallet.id == _walletId)
+                      .name,
           ),
         ),
         child: const Text('تطبیق'),
@@ -404,15 +537,27 @@ class _ExpenseFilterDialogState extends State<_ExpenseFilterDialog> {
 class _ExpensesTable extends StatelessWidget {
   const _ExpensesTable({
     required this.expenses,
+    required this.pageIndex,
+    required this.pageSize,
+    required this.pageCount,
+    required this.totalCount,
     required this.dateLabel,
     required this.onDetails,
     required this.onReverse,
+    required this.onPreviousPage,
+    required this.onNextPage,
   });
 
   final List<ExpenseRecord> expenses;
+  final int pageIndex;
+  final int pageSize;
+  final int pageCount;
+  final int totalCount;
   final String Function(String date) dateLabel;
   final ValueChanged<ExpenseRecord> onDetails;
   final ValueChanged<ExpenseRecord> onReverse;
+  final VoidCallback onPreviousPage;
+  final VoidCallback onNextPage;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -421,16 +566,17 @@ class _ExpensesTable extends StatelessWidget {
       children: [
         Container(
           color: HesabTheme.selectionSurface(context),
-          padding: const EdgeInsetsDirectional.fromSTEB(14, 10, 14, 10),
-          child: const Row(
+          padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 12, 6),
+          child: Row(
             children: [
+              SizedBox(width: 38, child: Text('#')),
               Expanded(flex: 12, child: Text('تاریخ')),
               Expanded(flex: 18, child: Text('جنس')),
               Expanded(flex: 16, child: Text('دسته‌بندی')),
               Expanded(flex: 14, child: Text('کیف پول')),
               Expanded(flex: 14, child: Text('مقدار')),
               Expanded(flex: 17, child: Text('مجموع')),
-              SizedBox(width: 72, child: Text('عملیات')),
+              SizedBox(width: 76, child: Text('عملیات')),
             ],
           ),
         ),
@@ -441,12 +587,19 @@ class _ExpensesTable extends StatelessWidget {
                 Divider(height: 1, color: Theme.of(context).dividerColor),
             itemBuilder: (context, index) {
               final expense = expenses[index];
-              return SizedBox(
-                height: 56,
+              return ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
                 child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(14, 5, 14, 5),
+                  padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 4),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      SizedBox(
+                        width: 38,
+                        child: _CellText(
+                          _dariDigits(pageIndex * pageSize + index + 1),
+                        ),
+                      ),
                       Expanded(
                         flex: 12,
                         child: _CellText(dateLabel(expense.date)),
@@ -474,7 +627,7 @@ class _ExpensesTable extends StatelessWidget {
                         ),
                       ),
                       SizedBox(
-                        width: 72,
+                        width: 76,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -483,8 +636,8 @@ class _ExpensesTable extends StatelessWidget {
                               visualDensity: VisualDensity.compact,
                               iconSize: 17,
                               constraints: const BoxConstraints.tightFor(
-                                width: 32,
-                                height: 32,
+                                width: 36,
+                                height: 36,
                               ),
                               onPressed: () => onDetails(expense),
                               icon: const Icon(Icons.info_outline_rounded),
@@ -503,8 +656,8 @@ class _ExpensesTable extends StatelessWidget {
                                 visualDensity: VisualDensity.compact,
                                 iconSize: 17,
                                 constraints: const BoxConstraints.tightFor(
-                                  width: 32,
-                                  height: 32,
+                                  width: 36,
+                                  height: 36,
                                 ),
                                 onPressed: () => onReverse(expense),
                                 icon: const Icon(Icons.undo_rounded),
@@ -519,10 +672,82 @@ class _ExpensesTable extends StatelessWidget {
             },
           ),
         ),
+        _ExpensePaginationBar(
+          firstRow: pageIndex * pageSize + 1,
+          lastRow: pageIndex * pageSize + expenses.length,
+          totalCount: totalCount,
+          pageIndex: pageIndex,
+          pageCount: pageCount,
+          onPreviousPage: onPreviousPage,
+          onNextPage: onNextPage,
+        ),
       ],
     ),
   );
 }
+
+class _ExpensePaginationBar extends StatelessWidget {
+  const _ExpensePaginationBar({
+    required this.firstRow,
+    required this.lastRow,
+    required this.totalCount,
+    required this.pageIndex,
+    required this.pageCount,
+    required this.onPreviousPage,
+    required this.onNextPage,
+  });
+
+  final int firstRow;
+  final int lastRow;
+  final int totalCount;
+  final int pageIndex;
+  final int pageCount;
+  final VoidCallback onPreviousPage;
+  final VoidCallback onNextPage;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsetsDirectional.fromSTEB(12, 2, 12, 2),
+    child: Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      runSpacing: 2,
+      children: [
+        Text(
+          'نمایش ${_dariDigits(firstRow)}–${_dariDigits(lastRow)} از ${_dariDigits(totalCount)} مورد',
+          style: const TextStyle(fontSize: HesabTheme.fontCaption),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'صفحه پیشین',
+              visualDensity: VisualDensity.compact,
+              onPressed: pageIndex > 0 ? onPreviousPage : null,
+              icon: const Icon(Icons.chevron_right_rounded),
+            ),
+            Text(
+              'صفحه ${_dariDigits(pageIndex + 1)} از ${_dariDigits(pageCount)}',
+              style: const TextStyle(fontSize: HesabTheme.fontCaption),
+            ),
+            IconButton(
+              tooltip: 'صفحه بعدی',
+              visualDensity: VisualDensity.compact,
+              onPressed: pageIndex + 1 < pageCount ? onNextPage : null,
+              icon: const Icon(Icons.chevron_left_rounded),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+String _dariDigits(int value) => value.toString().replaceAllMapped(
+  RegExp(r'\d'),
+  (match) => String.fromCharCode(match.group(0)!.codeUnitAt(0) + 1728),
+);
 
 class _CellText extends StatelessWidget {
   const _CellText(this.value, {this.strong = false});
@@ -530,13 +755,16 @@ class _CellText extends StatelessWidget {
   final bool strong;
 
   @override
-  Widget build(BuildContext context) => Text(
-    value,
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-    style: TextStyle(
-      fontSize: HesabTheme.fontCaption,
-      fontWeight: strong ? FontWeight.w600 : FontWeight.w400,
+  Widget build(BuildContext context) => Tooltip(
+    message: value,
+    child: Text(
+      value,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: HesabTheme.fontCaption,
+        fontWeight: strong ? FontWeight.w600 : FontWeight.w400,
+      ),
     ),
   );
 }
