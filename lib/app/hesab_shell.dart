@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/calendar/jalali_date.dart';
 import '../core/theme/hesab_theme.dart';
@@ -357,11 +358,35 @@ class _HesabMark extends StatelessWidget {
   final bool compact;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: compact ? 42 : 50,
-    height: compact ? 42 : 50,
-    child: Image.asset('asset/piggy_bank.png'),
-  );
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SizedBox(
+      width: compact ? 42 : 50,
+      height: compact ? 42 : 50,
+      child: SvgPicture.asset(
+        'asset/logo.svg',
+        colorMapper: _LogoOutlineColorMapper(
+          isDark ? const Color(0xFFF2F5F4) : const Color(0xFF231F20),
+        ),
+      ),
+    );
+  }
+}
+
+class _LogoOutlineColorMapper extends ColorMapper {
+  const _LogoOutlineColorMapper(this.outlineColor);
+
+  final Color outlineColor;
+
+  @override
+  Color substitute(
+    String? id,
+    String elementName,
+    String attributeName,
+    Color color,
+  ) => attributeName == 'stroke' && color == const Color(0xFF231F20)
+      ? outlineColor
+      : color;
 }
 
 class _NavigationButton extends StatelessWidget {
