@@ -56,7 +56,7 @@ void main() {
           walletId: 1,
           itemId: 1,
           date: DateTime(2026, 11, 18),
-          quantityCenti: 1000,
+          quantityCenti: 10000,
           unitPriceMinor: 100,
         ),
         throwsA(isA<AppFailure>()),
@@ -107,7 +107,7 @@ void main() {
       expect(await database.query('unit'), hasLength(2));
       expect(await database.query('item'), hasLength(2));
 
-      await service.purchaseWithNewProduct(
+      final originalCorrectionId = await service.purchaseWithNewProduct(
         walletId: 1,
         productName: 'بِرنج',
         categoryId: 1,
@@ -118,6 +118,66 @@ void main() {
       );
       expect(await database.query('item'), hasLength(2));
       expect(await service.expenses(), hasLength(3));
+
+      final balanceBeforeCorrection = await CatalogRepository(database)
+          .activeWallet(1)
+          .then((wallet) => wallet!.balanceMinor);
+      final replacementId = await service.correctPurchaseWithNewProduct(
+        originalTransactionId: originalCorrectionId,
+        walletId: 1,
+        productName: 'برنج',
+        categoryId: 1,
+        unitId: 1,
+        correctionDate: DateTime(2026, 11, 22),
+        purchaseDate: DateTime(2026, 11, 22),
+        quantityCenti: 100,
+        unitPriceMinor: 50,
+        note: 'اصلاح مقدار و قیمت',
+      );
+      final correctedExpenses = await service.expenses();
+      expect(
+        correctedExpenses
+            .singleWhere(
+              (expense) => expense.transactionId == originalCorrectionId,
+            )
+            .isReversed,
+        isTrue,
+      );
+      final replacement = correctedExpenses.singleWhere(
+        (expense) => expense.transactionId == replacementId,
+      );
+      expect(replacement.quantityCenti, 100);
+      expect(replacement.unitPriceMinor, 50);
+      expect(replacement.note, 'اصلاح مقدار و قیمت');
+      expect(correctedExpenses, hasLength(4));
+
+      await expectLater(
+        service.correctPurchaseWithNewProduct(
+          originalTransactionId: replacementId,
+          walletId: 1,
+          productName: 'برنج',
+          categoryId: 1,
+          unitId: 1,
+          correctionDate: DateTime(2026, 11, 23),
+          purchaseDate: DateTime(2026, 11, 23),
+          quantityCenti: 100,
+          unitPriceMinor: 600000,
+        ),
+        throwsA(isA<AppFailure>()),
+      );
+      expect(await database.query('wallet_transaction'), hasLength(7));
+      expect(
+        await CatalogRepository(database)
+            .activeWallet(1)
+            .then((wallet) => wallet!.balanceMinor),
+        balanceBeforeCorrection + 50,
+      );
+      expect(
+        (await service.expenses())
+            .singleWhere((expense) => expense.transactionId == replacementId)
+            .isReversed,
+        isFalse,
+      );
     },
   );
 }

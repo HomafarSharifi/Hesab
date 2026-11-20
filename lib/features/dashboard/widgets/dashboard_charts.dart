@@ -49,7 +49,12 @@ class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
           ? _loadYearlyExpenses(selectedId)
           : widget.loadMonthlyExpenses(itemId: selectedId, jalaliYear: _year);
     }
-    final years = List<int>.generate(6, (i) => _year - i);
+    final currentJalaliYear = JalaliDate.fromGregorian(DateTime.now()).year;
+    final years = List<int>.generate(101, (index) => currentJalaliYear - index);
+    final selectedItem = widget.items.where((item) => item.id == selectedId);
+    final selectedItemName = selectedItem.isEmpty
+        ? 'انتخاب جنس'
+        : selectedItem.first.name;
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
@@ -74,72 +79,43 @@ class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
             ],
           ),
           const SizedBox(height: 8),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
             children: [
-              Expanded(
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<bool>(
-                    isExpanded: true,
-                    value: _yearView,
-                    items: const [
-                      DropdownMenuItem(value: false, child: Text('ماه‌ها')),
-                      DropdownMenuItem(value: true, child: Text('سال‌ها')),
-                    ],
-                    onChanged: (value) => setState(() {
-                      _yearView = value!;
-                      _hoveredIndex = null;
-                    }),
-                  ),
-                ),
+              _FilterMenuButton<bool>(
+                label: _yearView ? 'سال‌ها' : 'ماه‌ها',
+                selected: _yearView,
+                options: const [(false, 'ماه‌ها'), (true, 'سال‌ها')],
+                onSelected: (value) => setState(() {
+                  _yearView = value;
+                  _hoveredIndex = null;
+                }),
               ),
-              if (!_yearView) const SizedBox(width: 8),
               if (!_yearView)
-                Expanded(
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<int>(
-                      isExpanded: true,
-                      value: years.contains(_year) ? _year : years.first,
-                      items: [
-                        for (final year in years)
-                          DropdownMenuItem(
-                            value: year,
-                            child: Text(
-                              _chartDariDigits(year.toString()),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
-                      onChanged: (value) => setState(() {
-                        _year = value!;
-                        _hoveredIndex = null;
-                      }),
-                    ),
-                  ),
+                _FilterMenuButton<int>(
+                  label: _chartDariDigits(_year.toString()),
+                  selected: _year,
+                  options: [
+                    for (final year in years)
+                      (year, _chartDariDigits(year.toString())),
+                  ],
+                  onSelected: (value) => setState(() {
+                    _year = value;
+                    _hoveredIndex = null;
+                  }),
                 ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<int>(
-                    isExpanded: true,
-                    value: selectedId,
-                    hint: const Text('انتخاب جنس'),
-                    items: [
-                      for (final item in widget.items)
-                        DropdownMenuItem(
-                          value: item.id,
-                          child: Text(
-                            item.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                    onChanged: (value) => setState(() {
-                      _itemId = value;
-                      _hoveredIndex = null;
-                    }),
-                  ),
-                ),
+              _FilterMenuButton<int>(
+                label: selectedItemName,
+                selected: selectedId,
+                enabled: widget.items.isNotEmpty,
+                options: [
+                  for (final item in widget.items) (item.id, item.name),
+                ],
+                onSelected: (value) => setState(() {
+                  _itemId = value;
+                  _hoveredIndex = null;
+                }),
               ),
             ],
           ),
@@ -181,12 +157,15 @@ class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
                                   )] ??
                                   0,
                             );
-                      final peak = values.indexOf(
-                        values.reduce((a, b) => a > b ? a : b),
-                      );
-                      final active = (_hoveredIndex ?? peak)
-                          .clamp(0, values.length - 1)
-                          .toInt();
+                      final currentMonthIndex =
+                          JalaliDate.fromGregorian(DateTime.now()).month - 1;
+                      final active =
+                          (_hoveredIndex ??
+                                  (_yearView
+                                      ? values.length - 1
+                                      : currentMonthIndex))
+                              .clamp(0, values.length - 1)
+                              .toInt();
                       return Column(
                         children: [
                           if (snapshot.connectionState ==
@@ -242,6 +221,98 @@ class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
           (sum, amount) => sum + amount,
         ),
     };
+  }
+}
+
+class _FilterMenuButton<T> extends StatelessWidget {
+  const _FilterMenuButton({
+    required this.label,
+    required this.selected,
+    required this.options,
+    required this.onSelected,
+    this.enabled = true,
+  });
+
+  final String label;
+  final T? selected;
+  final List<(T, String)> options;
+  final ValueChanged<T> onSelected;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final child = MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: Material(
+        color: colors.surfaceContainerHighest.withValues(alpha: .45),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 38, maxWidth: 190),
+          padding: const EdgeInsetsDirectional.fromSTEB(10, 6, 10, 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: colors.outlineVariant),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 19,
+                color: enabled
+                    ? colors.primary
+                    : colors.onSurfaceVariant.withValues(alpha: .5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return PopupMenuButton<T>(
+      enabled: enabled,
+      initialValue: selected,
+      tooltip: label,
+      constraints: const BoxConstraints(
+        minWidth: 0,
+        maxWidth: 360,
+        maxHeight: 6 * 48,
+      ),
+      position: PopupMenuPosition.under,
+      onSelected: onSelected,
+      itemBuilder: (context) => [
+        for (final (value, optionLabel) in options)
+          PopupMenuItem<T>(
+            value: value,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (value == selected)
+                  Icon(Icons.check_rounded, color: colors.primary, size: 18)
+                else
+                  const SizedBox(width: 18),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    optionLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+      child: child,
+    );
   }
 }
 
@@ -388,10 +459,7 @@ String _compactChartAmount(int minor) {
   return _chartDariDigits(label);
 }
 
-String _chartDariDigits(String value) => value.replaceAllMapped(
-  RegExp(r'[0-9]'),
-  (m) => '۰۱۲۳۴۵۶۷۸۹'[int.parse(m[0]!)],
-);
+String _chartDariDigits(String value) => value;
 TextPainter _barTextPainter(String text, TextStyle style) => TextPainter(
   text: TextSpan(text: text, style: style),
   textDirection: TextDirection.rtl,
@@ -414,8 +482,19 @@ void _barText(
 }
 
 class ExpenseTrendCard extends StatefulWidget {
-  const ExpenseTrendCard({required this.monthlyExpenses, super.key});
+  const ExpenseTrendCard({
+    required this.monthlyExpenses,
+    required this.dailyExpenses,
+    required this.fromDate,
+    required this.toDate,
+    required this.selectedPeriod,
+    super.key,
+  });
   final Map<String, int> monthlyExpenses;
+  final Map<String, int> dailyExpenses;
+  final DateTime fromDate;
+  final DateTime? toDate;
+  final int selectedPeriod;
 
   @override
   State<ExpenseTrendCard> createState() => _ExpenseTrendCardState();
@@ -428,14 +507,32 @@ class _ExpenseTrendCardState extends State<ExpenseTrendCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final currentJalaliYear = JalaliDate.fromGregorian(DateTime.now()).year;
-    final values = List<int>.generate(
-      12,
-      (index) =>
-          widget
-              .monthlyExpenses['$currentJalaliYear-${(index + 1).toString().padLeft(2, '0')}'] ??
-          0,
-    );
+    final rangeDays = (widget.toDate ?? DateTime.now())
+        .difference(widget.fromDate)
+        .inDays;
+    final weeklyView =
+        widget.selectedPeriod == 0 ||
+        (widget.selectedPeriod == 2 && rangeDays <= 45);
+    final month = JalaliDate.fromGregorian(widget.fromDate);
+    final labels = weeklyView
+        ? List<String>.generate(5, (index) => 'هفته ${index + 1}')
+        : afghanJalaliMonths;
+    final values = weeklyView
+        ? List<int>.filled(5, 0)
+        : List<int>.generate(12, (index) {
+            final key =
+                '${month.year}-${(index + 1).toString().padLeft(2, '0')}';
+            return widget.monthlyExpenses[key] ?? 0;
+          });
+    if (weeklyView) {
+      for (final entry in widget.dailyExpenses.entries) {
+        final date = JalaliDate.fromGregorian(DateTime.parse(entry.key));
+        if (date.year == month.year && date.month == month.month) {
+          final week = ((date.day - 1) ~/ 7).clamp(0, 4);
+          values[week] += entry.value;
+        }
+      }
+    }
     final peak = values.indexOf(values.reduce((a, b) => a > b ? a : b));
     final focusIndex = (_hoveredIndex ?? peak)
         .clamp(0, values.length - 1)
@@ -471,13 +568,13 @@ class _ExpenseTrendCardState extends State<ExpenseTrendCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'روند مصارف ماهانه',
+                      weeklyView ? 'روند مصارف هفتگی' : 'روند مصارف ماهانه',
                       style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
-                      'مقایسه مصارف ۱۲ ماه سال هجری شمسی',
+                      weeklyView ? 'مصارف هفته‌های ماه' : 'مقایسه مصارف 12 ماه',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -499,7 +596,7 @@ class _ExpenseTrendCardState extends State<ExpenseTrendCard> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
-                    '${afghanJalaliMonths[focusIndex]}: ${AmountCodec.formatMoneyMinor(values[focusIndex])}',
+                    '${labels[focusIndex]}: ${AmountCodec.formatMoneyMinor(values[focusIndex])}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -534,7 +631,7 @@ class _ExpenseTrendCardState extends State<ExpenseTrendCard> {
                       child: CustomPaint(
                         size: Size(constraints.maxWidth, constraints.maxHeight),
                         painter: _ReferenceMonthlyLinePainter(
-                          months: afghanJalaliMonths,
+                          months: labels,
                           values: values,
                           activeIndex: focusIndex,
                           border: colors.outlineVariant,
@@ -583,19 +680,26 @@ class _ReferenceCategoryBreakdownCardState
     extends State<ReferenceCategoryBreakdownCard> {
   int? _hoveredIndex;
 
+  static const Color _kActiveLime = Color(0xFF7FDF3C);
+  static const Color _kActiveGreenText = Color(0xFF3E9B12);
+
   int? _hitTest(Offset point, Size size, List<int> values, int total) {
     if (values.isEmpty || total <= 0) return null;
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.shortestSide / 2 - 14;
-    final stroke = radius * .25;
+    final outerR = size.shortestSide / 2 - 4;
+    final innerR = outerR * 0.59;
     final distance = (point - center).distance;
-    if (distance < radius - stroke / 2 - 10 ||
-        distance > radius + stroke / 2 + 12) {
+    if (distance < innerR - 6 || distance > outerR + 6) {
       return null;
     }
-    var angle =
-        math.atan2(point.dy - center.dy, point.dx - center.dx) + math.pi / 2;
+
+    // Matches the top-centered arch of the largest category
+    final firstSweep = values.first / total * math.pi * 2;
+    final startOffset = -math.pi / 2 - firstSweep / 2;
+    final rawAngle = math.atan2(point.dy - center.dy, point.dx - center.dx);
+    var angle = (rawAngle - startOffset) % (math.pi * 2);
     if (angle < 0) angle += math.pi * 2;
+
     var start = 0.0;
     for (var index = 0; index < values.length; index++) {
       final sweep = values[index] / total * math.pi * 2;
@@ -609,28 +713,29 @@ class _ReferenceCategoryBreakdownCardState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final entries = widget.categories.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final values = entries.map((entry) => entry.value).toList();
     final total = values.fold<int>(0, (sum, value) => sum + value);
-    final palette = <Color>[
-      const Color(0xFF66D82D),
-      colors.primary,
-      const Color(0xFF4E8ADF),
-      const Color(0xFFF0B942),
-      const Color(0xFFAB72C4),
-      const Color(0xFFE57C68),
-    ];
-    final largest = values.isEmpty
-        ? 0
-        : values.indexOf(values.reduce(math.max));
+
+    final inactiveGray =
+        isDark ? const Color(0xFF424E48) : const Color(0xFF9EA09F);
+    final innerFill =
+        isDark ? const Color(0xFF1A2621) : const Color(0xFFF7F7F7);
+    final innerBorder =
+        isDark ? const Color(0xFF283932) : const Color(0xFFECEEEE);
+    final accentReadable = isDark ? _kActiveLime : _kActiveGreenText;
+
+    final largest =
+        values.isEmpty ? 0 : values.indexOf(values.reduce(math.max));
     final activeIndex = _hoveredIndex != null && _hoveredIndex! < entries.length
         ? _hoveredIndex!
         : largest;
     final active = entries.isEmpty ? null : entries[activeIndex];
-    final share = active == null || total == 0
-        ? 0.0
-        : active.value / total * 100;
+    final share =
+        active == null || total == 0 ? 0.0 : active.value / total * 100;
 
     return Container(
       decoration: BoxDecoration(
@@ -672,9 +777,7 @@ class _ReferenceCategoryBreakdownCardState
               const SizedBox(width: 5),
               _CategoryShareBadge(
                 share: share,
-                color: active == null
-                    ? colors.primary
-                    : palette[activeIndex % palette.length],
+                color: accentReadable,
               ),
             ],
           ),
@@ -715,13 +818,15 @@ class _ReferenceCategoryBreakdownCardState
                                   size: Size.square(side),
                                   painter: _ReferenceDonutPainter(
                                     values: values,
-                                    colors: palette,
-                                    trackColor: colors.surfaceContainerHighest,
                                     activeIndex: activeIndex,
+                                    activeColor: _kActiveLime,
+                                    inactiveColor: inactiveGray,
+                                    innerFillColor: innerFill,
+                                    innerBorderColor: innerBorder,
                                   ),
                                 ),
                                 Padding(
-                                  padding: EdgeInsets.all(side * .27),
+                                  padding: EdgeInsets.all(side * .25),
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -732,11 +837,12 @@ class _ReferenceCategoryBreakdownCardState
                                         overflow: TextOverflow.ellipsis,
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
-                                          color: colors.onSurfaceVariant,
-                                          fontSize: 9,
+                                          color: colors.onSurface,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
-                                      const SizedBox(height: 2),
+                                      const SizedBox(height: 3),
                                       FittedBox(
                                         fit: BoxFit.scaleDown,
                                         child: Text(
@@ -745,23 +851,23 @@ class _ReferenceCategoryBreakdownCardState
                                           ),
                                           style: TextStyle(
                                             color: colors.onSurface,
-                                            fontSize: 13,
+                                            fontSize: 14,
                                             fontWeight: FontWeight.w800,
                                           ),
                                         ),
                                       ),
-                                      if (active != null)
+                                      if (active != null) ...[
+                                        const SizedBox(height: 2),
                                         Text(
                                           '${_chartDariDigits((widget.purchaseCounts[active.key] ?? 0).toString())} خرید',
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
-                                            color:
-                                                palette[activeIndex %
-                                                    palette.length],
-                                            fontSize: 8,
+                                            color: accentReadable,
+                                            fontSize: 8.5,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -798,7 +904,9 @@ class _ReferenceCategoryBreakdownCardState
                               _ReferenceCategoryRow(
                                 name: entries[index].key,
                                 amount: entries[index].value,
-                                color: palette[index % palette.length],
+                                color: index == activeIndex
+                                    ? _kActiveLime
+                                    : inactiveGray,
                                 active: index == activeIndex,
                                 onHover: (hovering) => setState(
                                   () => _hoveredIndex = hovering ? index : null,
@@ -814,6 +922,196 @@ class _ReferenceCategoryBreakdownCardState
       ),
     );
   }
+}
+
+class _ReferenceDonutPainter extends CustomPainter {
+  const _ReferenceDonutPainter({
+    required this.values,
+    required this.activeIndex,
+    this.activeColor = const Color(0xFF7FDF3C),
+    this.inactiveColor = const Color(0xFF9EA09F),
+    this.innerFillColor = const Color(0xFFF7F7F7),
+    this.innerBorderColor = const Color(0xFFECEEEE),
+  });
+
+  final List<int> values;
+  final int activeIndex;
+  final Color activeColor;
+  final Color inactiveColor;
+  final Color innerFillColor;
+  final Color innerBorderColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final total = values.fold<int>(0, (sum, value) => sum + value);
+    final center = Offset(size.width / 2, size.height / 2);
+    final outerR = size.shortestSide / 2 - 4;
+    final innerR = outerR * 0.59;
+    final gapPx = math.max(2.6, outerR * 0.028);
+
+    // Soft inner circle (#F7F7F7) separated by a crisp gap from the ring
+    final discR = math.max(0.0, innerR - gapPx);
+    canvas.drawCircle(center, discR, Paint()..color = innerFillColor);
+    canvas.drawCircle(
+      center,
+      discR,
+      Paint()
+        ..color = innerBorderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
+
+    if (values.isEmpty || total <= 0) {
+      final emptyRing = Path()
+        ..fillType = PathFillType.evenOdd
+        ..addOval(Rect.fromCircle(center: center, radius: outerR))
+        ..addOval(Rect.fromCircle(center: center, radius: innerR));
+      canvas.drawPath(emptyRing, Paint()..color = inactiveColor.withAlpha(80));
+      return;
+    }
+
+    // Centers the largest category across the top arch (9 o'clock -> 3 o'clock at 50%)
+    final firstSweep = values.first / total * math.pi * 2;
+    var startAngle = -math.pi / 2 - firstSweep / 2;
+
+    for (var i = 0; i < values.length; i++) {
+      final sweep = values[i] / total * math.pi * 2;
+      if (sweep <= 0) continue;
+
+      final path = _buildRoundedSectorPath(
+        center: center,
+        outerR: outerR,
+        innerR: innerR,
+        startAngle: startAngle,
+        sweep: sweep,
+        gapPx: values.length > 1 ? gapPx : 0.0,
+      );
+
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = i == activeIndex ? activeColor : inactiveColor
+          ..style = PaintingStyle.fill
+          ..isAntiAlias = true,
+      );
+
+      startAngle += sweep;
+    }
+  }
+
+  Path _buildRoundedSectorPath({
+    required Offset center,
+    required double outerR,
+    required double innerR,
+    required double startAngle,
+    required double sweep,
+    required double gapPx,
+  }) {
+    if (sweep >= math.pi * 2 - 0.001 || gapPx <= 0.0) {
+      return Path()
+        ..fillType = PathFillType.evenOdd
+        ..addOval(Rect.fromCircle(center: center, radius: outerR))
+        ..addOval(Rect.fromCircle(center: center, radius: innerR));
+    }
+
+    final thickness = outerR - innerR;
+    final sinHalf = math.sin(math.min(sweep * 0.46, math.pi * 0.48));
+    final h = math.min(gapPx / 2.0, innerR * sinHalf * 0.72);
+
+    final cOut = math.max(
+      0.0,
+      math.min(
+        math.min(outerR * 0.095, thickness * 0.45),
+        (outerR * sinHalf - h) / (1.0 + sinHalf),
+      ),
+    );
+    final cIn = math.max(
+      0.0,
+      math.min(
+        math.min(outerR * 0.070, thickness * 0.40),
+        (innerR * sinHalf - h) / math.max(1e-6, 1.0 - sinHalf),
+      ),
+    );
+
+    final a0 = startAngle;
+    final a1 = startAngle + sweep;
+    final alphaOut = math.asin(((h + cOut) / (outerR - cOut)).clamp(-1.0, 1.0));
+    final alphaIn = math.asin(((h + cIn) / (innerR + cIn)).clamp(-1.0, 1.0));
+
+    Offset polar(double rad, double ang) =>
+        Offset(center.dx + rad * math.cos(ang), center.dy + rad * math.sin(ang));
+
+    final cOs = polar(outerR - cOut, a0 + alphaOut);
+    final cOe = polar(outerR - cOut, a1 - alphaOut);
+    final cIe = polar(innerR + cIn, a1 - alphaIn);
+    final cIs = polar(innerR + cIn, a0 + alphaIn);
+
+    final path = Path();
+
+    if (cOut > 0.2) {
+      path.arcTo(
+        Rect.fromCircle(center: cOs, radius: cOut),
+        a0 - math.pi / 2,
+        math.pi / 2 + alphaOut,
+        true,
+      );
+    } else {
+      final p = polar(outerR, a0 + alphaOut);
+      path.moveTo(p.dx, p.dy);
+    }
+
+    path.arcTo(
+      Rect.fromCircle(center: center, radius: outerR),
+      a0 + alphaOut,
+      math.max(0.0, sweep - 2 * alphaOut),
+      false,
+    );
+
+    if (cOut > 0.2) {
+      path.arcTo(
+        Rect.fromCircle(center: cOe, radius: cOut),
+        a1 - alphaOut,
+        math.pi / 2 + alphaOut,
+        false,
+      );
+    }
+
+    if (cIn > 0.2) {
+      path.arcTo(
+        Rect.fromCircle(center: cIe, radius: cIn),
+        a1 + math.pi / 2,
+        math.pi / 2 - alphaIn,
+        false,
+      );
+    }
+
+    path.arcTo(
+      Rect.fromCircle(center: center, radius: innerR),
+      a1 - alphaIn,
+      -math.max(0.0, sweep - 2 * alphaIn),
+      false,
+    );
+
+    if (cIn > 0.2) {
+      path.arcTo(
+        Rect.fromCircle(center: cIs, radius: cIn),
+        a0 + alphaIn - math.pi,
+        math.pi / 2 - alphaIn,
+        false,
+      );
+    }
+
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldRepaint(covariant _ReferenceDonutPainter oldDelegate) =>
+      oldDelegate.values != values ||
+      oldDelegate.activeIndex != activeIndex ||
+      oldDelegate.activeColor != activeColor ||
+      oldDelegate.inactiveColor != inactiveColor ||
+      oldDelegate.innerFillColor != innerFillColor;
 }
 
 class _CategoryShareBadge extends StatelessWidget {
@@ -905,79 +1203,6 @@ class _ReferenceCategoryRow extends StatelessWidget {
   );
 }
 
-class _ReferenceDonutPainter extends CustomPainter {
-  const _ReferenceDonutPainter({
-    required this.values,
-    required this.colors,
-    required this.trackColor,
-    required this.activeIndex,
-  });
-  final List<int> values;
-  final List<Color> colors;
-  final Color trackColor;
-  final int activeIndex;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final total = values.fold<int>(0, (sum, value) => sum + value);
-    if (size.shortestSide <= 0) return;
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.shortestSide / 2 - 14;
-    if (radius <= 0) return;
-    final stroke = radius * .25;
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..color = trackColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke,
-    );
-    if (total <= 0) return;
-    final gap = values.length > 1 ? stroke / radius + .05 : 0.0;
-    var start = -math.pi / 2;
-    for (var i = 0; i < values.length; i++) {
-      final sweep = values[i] / total * math.pi * 2;
-      final active = i == activeIndex;
-      final effectiveGap = math.min(gap, sweep * .65);
-      final visibleSweep = math.max(.02, sweep - effectiveGap);
-      final arcRadius = active ? radius + 3.5 : radius;
-      if (active) {
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: arcRadius),
-          start + effectiveGap / 2,
-          visibleSweep,
-          false,
-          Paint()
-            ..color = colors[i % colors.length].withValues(alpha: .3)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = stroke + 9
-            ..strokeCap = StrokeCap.round
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-        );
-      }
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: arcRadius),
-        start + effectiveGap / 2,
-        visibleSweep,
-        false,
-        Paint()
-          ..color = colors[i % colors.length]
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = active ? stroke + 3 : stroke
-          ..strokeCap = StrokeCap.round,
-      );
-      start += sweep;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ReferenceDonutPainter old) =>
-      old.values != values ||
-      old.colors != colors ||
-      old.trackColor != trackColor ||
-      old.activeIndex != activeIndex;
-}
 
 class CategoryBreakdownCard extends StatelessWidget {
   const CategoryBreakdownCard({

@@ -264,10 +264,7 @@ class _JalaliDatePickerDialogState extends State<JalaliDatePickerDialog> {
     );
   }
 
-  String _dariDigits(int value) => value.toString().replaceAllMapped(
-    RegExp(r'\d'),
-    (match) => String.fromCharCode(match.group(0)!.codeUnitAt(0) + 1728),
-  );
+  String _dariDigits(int value) => value.toString();
 }
 
 class _YearDialog extends StatefulWidget {

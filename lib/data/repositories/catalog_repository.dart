@@ -1,6 +1,7 @@
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../models/catalog_models.dart';
+import '../../core/errors/app_failure.dart';
 
 class CatalogRepository {
   const CatalogRepository(this._database);
@@ -31,6 +32,26 @@ class CatalogRepository {
     );
   }
 
+  Future<void> deleteCategory(int id) async {
+    if (await _referenceCount('item', 'category_id', id) > 0) {
+      throw const AppFailure(
+        'این دسته‌بندی در اجناس استفاده شده و حذف نمی‌شود.',
+      );
+    }
+    await _database.delete(
+      'category',
+      where: 'category_id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> updateCategory(int id, String name, String normalizedName) async {
+    await _database.update('category', {
+      'category_name': name,
+      'normalized_name': normalizedName,
+    }, where: 'category_id = ?', whereArgs: [id]);
+  }
+
   Future<bool> activeCategoryExists(int id) async =>
       ((await _database.rawQuery(
             'SELECT COUNT(*) FROM category WHERE category_id = ? AND archived_at IS NULL',
@@ -58,6 +79,20 @@ class CatalogRepository {
       where: 'unit_id = ? AND archived_at IS NULL',
       whereArgs: [id],
     );
+  }
+
+  Future<void> deleteUnit(int id) async {
+    if (await _referenceCount('item', 'unit_id', id) > 0) {
+      throw const AppFailure('این واحد در اجناس استفاده شده و حذف نمی‌شود.');
+    }
+    await _database.delete('unit', where: 'unit_id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updateUnit(int id, String name, String normalizedName) async {
+    await _database.update('unit', {
+      'unit_name': name,
+      'normalized_name': normalizedName,
+    }, where: 'unit_id = ?', whereArgs: [id]);
   }
 
   Future<bool> activeUnitExists(int id) async =>
@@ -172,6 +207,33 @@ class CatalogRepository {
     );
   }
 
+  Future<void> deleteItem(int id) async {
+    if (await _referenceCount('expense', 'item_id', id) > 0) {
+      throw const AppFailure(
+        'این جنس در سابقه خرید استفاده شده و حذف نمی‌شود.',
+      );
+    }
+    await _database.delete('item', where: 'item_id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updateItem({
+    required int id,
+    required String name,
+    required String normalizedName,
+    required int categoryId,
+    required int unitId,
+  }) async {
+    if (await _referenceCount('expense', 'item_id', id) > 0) {
+      throw const AppFailure('این جنس سابقه خرید دارد و برای حفظ تاریخچه ویرایش نمی‌شود.');
+    }
+    await _database.update('item', {
+      'item_name': name,
+      'normalized_name': normalizedName,
+      'category_id': categoryId,
+      'unit_id': unitId,
+    }, where: 'item_id = ?', whereArgs: [id]);
+  }
+
   Future<bool> categoryNameExists(String normalizedName) async =>
       _exists('category', 'normalized_name = ?', [normalizedName]);
 
@@ -242,4 +304,28 @@ class CatalogRepository {
       whereArgs: [id],
     );
   }
+
+  Future<void> deleteWallet(int id) async {
+    if (await _referenceCount('wallet_transaction', 'wallet_id', id) > 0) {
+      throw const AppFailure('این کیف پول سابقه تراکنش دارد و حذف نمی‌شود.');
+    }
+    await _database.delete('wallet', where: 'wallet_id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updateWallet(int id, String name, String normalizedName) async {
+    if (await _referenceCount('wallet_transaction', 'wallet_id', id) > 0) {
+      throw const AppFailure('این کیف پول سابقه تراکنش دارد و برای حفظ تاریخچه ویرایش نمی‌شود.');
+    }
+    await _database.update('wallet', {
+      'wallet_name': name,
+      'normalized_name': normalizedName,
+    }, where: 'wallet_id = ?', whereArgs: [id]);
+  }
+
+  Future<int> _referenceCount(String table, String column, int id) async =>
+      (await _database.rawQuery(
+            'SELECT COUNT(*) FROM $table WHERE $column = ?',
+            [id],
+          )).single.values.first
+          as int;
 }

@@ -84,6 +84,30 @@ class CatalogService {
   Future<void> archiveUnit(int id) => _repository.archiveUnit(id, _now());
   Future<void> archiveItem(int id) => _repository.archiveItem(id, _now());
   Future<void> archiveWallet(int id) => _repository.archiveWallet(id, _now());
+  Future<void> deleteCategory(int id) => _repository.deleteCategory(id);
+  Future<void> deleteUnit(int id) => _repository.deleteUnit(id);
+  Future<void> deleteItem(int id) => _repository.deleteItem(id);
+  Future<void> deleteWallet(int id) => _repository.deleteWallet(id);
+
+  Future<void> updateName({required String type, required int id, required String value}) async {
+    final name = _validateName(value, type == 'unit' ? 30 : 45);
+    final normalized = NameNormalizer.normalize(name);
+    if (type == 'category') {
+      await _repository.updateCategory(id, name, normalized);
+    } else if (type == 'unit') {
+      await _repository.updateUnit(id, name, normalized);
+    } else if (type == 'wallet') {
+      await _repository.updateWallet(id, name, normalized);
+    }
+  }
+
+  Future<void> updateItem({required int id, required String name, required int categoryId, required int unitId}) async {
+    final itemName = _validateName(name, 45);
+    if (!await _repository.activeCategoryExists(categoryId) || !await _repository.activeUnitExists(unitId)) {
+      throw const AppFailure('دسته‌بندی یا واحد انتخاب‌شده معتبر نیست.');
+    }
+    await _repository.updateItem(id: id, name: itemName, normalizedName: NameNormalizer.normalize(itemName), categoryId: categoryId, unitId: unitId);
+  }
 
   Future<List<String>> itemNameSuggestions(String query) async {
     final values = (await _repository.items()).map((item) => item.name);

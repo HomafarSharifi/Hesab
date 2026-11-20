@@ -4,7 +4,7 @@ Hesab is a Dari-first financial management application for Windows desktop, buil
 
 ## Product scope
 
-Implemented workflows include local wallets, deposits and withdrawals, atomic purchases with matching expenses, purchase reversal, category/unit/item management, normalized Dari/Persian names, Jalali period reports, and real dashboard summaries/charts. The Expenses screen supports filtered 50-row pagination and page-based XLSX export with one worksheet per selected page. CSV export and versioned backup/restore remain planned. Purchase entry supports selecting or creating a product, category, and unit within the atomic purchase workflow. All tabs share a responsive Jalali month/year/custom-range header; the custom range uses one dialog with start and end date pickers. The RTL shell supports compact and desktop navigation, and both light and dark themes use the supplied Yekan Bakh font. The piggy-bank mark is used in the app shell and Windows app icon. The application uses one currency, Afghan Afghani (AFN).
+Implemented workflows include local wallets, deposits and withdrawals, atomic purchases with matching expenses, purchase reversal, category/unit/item management, normalized Dari/Persian names, Jalali period reports, and real dashboard summaries/charts. The Expenses screen supports filtered 50-row pagination and page-based XLSX/CSV export; multiple CSV pages are packaged into one ZIP file. Versioned backup/restore remains planned. Purchase entry supports selecting or creating a product, category, and unit within the atomic purchase workflow. All tabs share a responsive Jalali month/year/custom-range header; the custom range uses one dialog with start and end date pickers. The RTL shell supports compact and desktop navigation, and both light and dark themes use the supplied Yekan Bakh font. The piggy-bank mark is used in the app shell and Windows app icon. The application uses one currency, Afghan Afghani (AFN).
 
 Confirmed financial rules include zero-balance wallets funded by deposits; atomic purchases with exactly one matching expense; rejection of insufficient-funds purchases by default; and reversal workflows for correcting committed transactions. See [AGENTS.md](AGENTS.md) for the full project conventions and confirmed rules.
 
@@ -13,6 +13,7 @@ Confirmed financial rules include zero-balance wallets funded by deposits; atomi
 - Flutter and Dart
 - SQLite for local storage
 - `excel` for typed XLSX workbook generation and `file_picker` for the native Windows save dialog
+- `archive` for packaging multiple selected CSV pages into one ZIP file
 - Windows desktop as the initial target
 
 ## Development status

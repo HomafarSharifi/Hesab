@@ -49,6 +49,19 @@ class FinancialRepository {
     'note': note,
   });
 
+  Future<void> insertPurchaseAllocations({
+    required int transactionId,
+    required Map<int, int> amountsByWallet,
+  }) async {
+    for (final entry in amountsByWallet.entries) {
+      await _database.insert('purchase_wallet_allocation', {
+        'transaction_id': transactionId,
+        'wallet_id': entry.key,
+        'amount_minor': entry.value,
+      });
+    }
+  }
+
   Future<Map<String, Object?>?> transactionById(int transactionId) async {
     final rows = await _database.query(
       'wallet_transaction',
@@ -128,7 +141,10 @@ class FinancialRepository {
     );
     final rows = await _database.rawQuery(
       '''
-      SELECT e.expense_id, e.transaction_id, t.wallet_id, w.wallet_name,
+      SELECT e.expense_id, e.transaction_id, t.wallet_id,
+             CASE WHEN (SELECT COUNT(*) FROM purchase_wallet_allocation a
+                        WHERE a.transaction_id = t.transaction_id) > 1
+                  THEN 'چند کیف پول' ELSE w.wallet_name END AS wallet_name,
              t.transaction_date, t.amount_minor, e.item_id, i.item_name,
              c.category_name, u.unit_name, e.quantity_centi,
              e.unit_price_minor, e.note,
@@ -181,7 +197,10 @@ class FinancialRepository {
     final totalCount = countRows.single['total_count']! as int;
     final rows = await _database.rawQuery(
       '''
-      SELECT e.expense_id, e.transaction_id, t.wallet_id, w.wallet_name,
+      SELECT e.expense_id, e.transaction_id, t.wallet_id,
+             CASE WHEN (SELECT COUNT(*) FROM purchase_wallet_allocation a
+                        WHERE a.transaction_id = t.transaction_id) > 1
+                  THEN 'چند کیف پول' ELSE w.wallet_name END AS wallet_name,
              t.transaction_date, t.amount_minor, e.item_id, i.item_name,
              c.category_name, u.unit_name, e.quantity_centi,
              e.unit_price_minor, e.note,
@@ -248,7 +267,9 @@ class FinancialRepository {
       arguments.add(normalizedSearch);
     }
     if (walletId != null) {
-      clauses.add('t.wallet_id = ?');
+      clauses.add(
+        'EXISTS (SELECT 1 FROM purchase_wallet_allocation a WHERE a.transaction_id = t.transaction_id AND a.wallet_id = ?)',
+      );
       arguments.add(walletId);
     }
     if (categoryName != null) {

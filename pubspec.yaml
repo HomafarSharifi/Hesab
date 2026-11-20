@@ -33,6 +33,7 @@ dependencies:
   material_ui: ^1.1.0
   flutter_svg: ^2.2.3
   sqflite_common_ffi: ^2.4.7
+  archive: ^3.6.1
   excel: ^4.0.6
   file_picker: ^10.3.10
 
@@ -65,6 +66,7 @@ flutter:
   assets:
     - asset/icon.png
     - asset/logo.svg
+    - asset/icons/
 
   fonts:
     - family: YekanBakh

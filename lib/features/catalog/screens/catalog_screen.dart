@@ -60,15 +60,35 @@ class _CatalogScreenState extends State<CatalogScreen> {
     }
   }
 
-  Future<void> _archive(String type, int id) async {
+  Future<void> _delete(String type, int id, String name) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف کامل'),
+        content: Text(
+          '«$name» به‌طور کامل حذف شود؟ اگر در سابقه استفاده شده باشد، حذف انجام نمی‌شود.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('لغو'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     try {
       switch (type) {
         case 'item':
-          await widget.services.catalog.archiveItem(id);
+          await widget.services.catalog.deleteItem(id);
         case 'category':
-          await widget.services.catalog.archiveCategory(id);
+          await widget.services.catalog.deleteCategory(id);
         case 'unit':
-          await widget.services.catalog.archiveUnit(id);
+          await widget.services.catalog.deleteUnit(id);
       }
       if (mounted) setState(() => _revision++);
     } catch (error) {
@@ -77,6 +97,24 @@ class _CatalogScreenState extends State<CatalogScreen> {
           SnackBar(
             content: Text(error.toString().replaceFirst('Exception: ', '')),
           ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editName(String type, int id, String currentName) async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => _NameDialog(title: 'ویرایش', initialName: currentName),
+    );
+    if (name == null || !mounted) return;
+    try {
+      await widget.services.catalog.updateName(type: type, id: id, value: name);
+      if (mounted) setState(() => _revision++);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
         );
       }
     }
@@ -154,9 +192,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
             : value is CategoryRecord
             ? value.id
             : (value as UnitRecord).id;
-        final label = isItem
-            ? '${value.name}  •  ${value.categoryName} / ${value.unitName}'
-            : value.name as String;
+        final label = value.name as String;
         return Card(
           child: ListTile(
             minTileHeight: HesabTheme.controlHeight,
@@ -164,17 +200,27 @@ class _CatalogScreenState extends State<CatalogScreen> {
               label,
               style: const TextStyle(fontSize: HesabTheme.fontBody),
             ),
-            trailing: IconButton(
-              tooltip: 'بایگانی',
-              icon: const Icon(Icons.archive_outlined),
-              onPressed: () => _archive(
-                _tab == 0
-                    ? 'item'
-                    : _tab == 1
-                    ? 'category'
-                    : 'unit',
-                id,
-              ),
+            trailing: Wrap(
+              children: [
+                IconButton(
+                  tooltip: 'ویرایش',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: () => _editName(
+                    _tab == 0 ? 'item' : _tab == 1 ? 'category' : 'unit',
+                    id,
+                    label,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'حذف',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () => _delete(
+                    _tab == 0 ? 'item' : _tab == 1 ? 'category' : 'unit',
+                    id,
+                    label,
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -184,14 +230,15 @@ class _CatalogScreenState extends State<CatalogScreen> {
 }
 
 class _NameDialog extends StatefulWidget {
-  const _NameDialog({required this.title});
+  const _NameDialog({required this.title, this.initialName = ''});
   final String title;
+  final String initialName;
   @override
   State<_NameDialog> createState() => _NameDialogState();
 }
 
 class _NameDialogState extends State<_NameDialog> {
-  final _controller = TextEditingController();
+  late final _controller = TextEditingController(text: widget.initialName);
   @override
   void dispose() {
     _controller.dispose();

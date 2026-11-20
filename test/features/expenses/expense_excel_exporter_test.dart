@@ -2,7 +2,7 @@ import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hesab/data/models/financial_models.dart';
 import 'package:hesab/features/expenses/services/expense_excel_exporter.dart';
-import 'package:hesab/features/expenses/widgets/expense_export_dialog.dart';
+import 'package:hesab/features/expenses/models/expense_export_models.dart';
 
 void main() {
   test('builds one typed worksheet per selected page with continuous rows', () {
@@ -31,26 +31,25 @@ void main() {
     expect(workbook.tables.keys.toList(), ['Page 2', 'Page 5']);
     final secondPage = workbook['Page 2'];
     expect(secondPage.rows, hasLength(2));
+    expect(secondPage.rows[1], hasLength(10));
     expect(secondPage.rows[0][0]?.value, isA<TextCellValue>());
     expect(secondPage.rows[1][0]?.value, isA<IntCellValue>());
     expect((secondPage.rows[1][0]!.value as IntCellValue).value, 51);
+    final headers = secondPage.rows[0]
+        .map((cell) => (cell!.value as TextCellValue).value.text!)
+        .toList();
+    expect(headers, hasLength(10));
+    expect(headers.any((header) => header.contains('شناسه')), isFalse);
+    expect(headers.any((header) => header.contains('میلادی')), isFalse);
     expect(
       (secondPage.rows[1][1]!.value as TextCellValue).value.text,
       '۱ حمل ۱۴۰۳',
     );
-    expect(secondPage.rows[1][2]!.value, isA<DateCellValue>());
-    expect(_numberValue(secondPage.rows[1][6]!.value), 2.5);
-    expect(_numberValue(secondPage.rows[1][8]!.value), 50.0);
-    expect(_numberValue(secondPage.rows[1][9]!.value), 123.45);
-    expect((secondPage.rows[1][10]!.value as TextCellValue).value.text, '');
-    expect(
-      (secondPage.rows[1][11]!.value as TextCellValue).value.text,
-      'برگشت‌شده',
-    );
-    expect((secondPage.rows[1][12]!.value as IntCellValue).value, 122);
-    expect((secondPage.rows[1][13]!.value as IntCellValue).value, 22);
-    expect((secondPage.rows[1][14]!.value as IntCellValue).value, 1);
-    expect((secondPage.rows[1][15]!.value as IntCellValue).value, 222);
+    expect(_numberValue(secondPage.rows[1][5]!.value), 2.5);
+    expect(_numberValue(secondPage.rows[1][7]!.value), 50.0);
+    expect(_numberValue(secondPage.rows[1][8]!.value), 123.45);
+    expect((secondPage.rows[1][9]!.value as TextCellValue).value.text, '');
+    expect(headers.any((header) => header.contains('وضعیت')), isFalse);
 
     final fifthPage = workbook['Page 5'];
     expect((fifthPage.rows[1][0]!.value as IntCellValue).value, 201);

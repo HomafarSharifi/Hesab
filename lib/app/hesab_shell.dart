@@ -34,14 +34,29 @@ class _HesabShellState extends State<HesabShell> {
   int _selectedPeriod = 0;
   DateTime? _customFrom;
   DateTime? _customTo;
+  int _newExpenseRequest = 0;
+
+  void _startNewExpense() {
+    setState(() {
+      _selectedIndex = 1;
+      _newExpenseRequest++;
+    });
+  }
+
+  void _selectPage(int index) {
+    setState(() {
+      _selectedIndex = index;
+      _newExpenseRequest = 0;
+    });
+  }
 
   static const _navigationItems = <_NavigationItem>[
-    _NavigationItem('پیشخوان', Icons.home_rounded),
-    _NavigationItem('مصارف', Icons.receipt_rounded),
-    _NavigationItem('اجناس', Icons.inventory_2_rounded),
-    _NavigationItem('کیف پول', Icons.account_balance_wallet_rounded),
-    _NavigationItem('گزارشات', Icons.pie_chart_rounded),
-    _NavigationItem('تنظیمات', Icons.settings_rounded),
+    _NavigationItem('پیشخوان', 'asset/icons/home.svg'),
+    _NavigationItem('مصارف', 'asset/icons/receipt.svg'),
+    _NavigationItem('اجناس', 'asset/icons/items.svg'),
+    _NavigationItem('کیف پول', 'asset/icons/wallet.svg'),
+    _NavigationItem('گزارشات', 'asset/icons/graph.svg'),
+    _NavigationItem('تنظیمات', 'asset/icons/setting.svg'),
   ];
 
   DateTime get _periodFrom {
@@ -107,8 +122,7 @@ class _HesabShellState extends State<HesabShell> {
                         _CompactNavigation(
                           items: _navigationItems,
                           selectedIndex: _selectedIndex,
-                          onSelect: (index) =>
-                              setState(() => _selectedIndex = index),
+                          onSelect: _selectPage,
                         ),
                       ],
                     )
@@ -132,10 +146,8 @@ class _HesabShellState extends State<HesabShell> {
                             child: _Sidebar(
                               selectedIndex: _selectedIndex,
                               items: _navigationItems,
-                              onSelect: (index) =>
-                                  setState(() => _selectedIndex = index),
-                              onNewExpense: () =>
-                                  setState(() => _selectedIndex = 1),
+                              onSelect: _selectPage,
+                              onNewExpense: _startNewExpense,
                             ),
                           ),
                         ),
@@ -179,12 +191,14 @@ class _HesabShellState extends State<HesabShell> {
                 services: widget.services,
                 fromDate: _periodFrom,
                 toDate: _periodTo,
+                selectedPeriod: _selectedPeriod,
                 onAddFunds: () => setState(() => _selectedIndex = 3),
               ),
               1 => ExpensesScreen(
                 services: widget.services,
                 fromDate: _periodFrom,
                 toDate: _periodTo,
+                newPurchaseRequest: _newExpenseRequest,
               ),
               2 => CatalogScreen(services: widget.services),
               3 => WalletScreen(services: widget.services),
@@ -233,12 +247,18 @@ class _CompactNavigation extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          items[index].icon,
-                          size: 21,
-                          color: index == selectedIndex
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        SvgPicture.asset(
+                          items[index].assetPath,
+                          width: 21,
+                          height: 21,
+                          colorFilter: ColorFilter.mode(
+                            index == selectedIndex
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                            BlendMode.srcIn,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -302,7 +322,7 @@ class _Sidebar extends StatelessWidget {
                         onPressed: onNewExpense,
                         icon: Icon(Icons.add_rounded, size: compact ? 21 : 26),
                         label: Text(
-                          'مصرف تازه',
+                          'ثبت مصرف',
                           style: TextStyle(
                             fontSize: compact
                                 ? HesabTheme.fontBody
@@ -333,15 +353,6 @@ class _Sidebar extends StatelessWidget {
                       if (i != items.length - 1)
                         SizedBox(height: compact ? 6 : 12),
                     ],
-                    SizedBox(height: compact ? 16 : 0),
-                    if (!compact) const SizedBox(height: 24),
-                    Text(
-                      'حساب',
-                      style: TextStyle(
-                        fontSize: HesabTheme.fontBody,
-                        color: colors.onSurface.withValues(alpha: 0.42),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -361,8 +372,8 @@ class _HesabMark extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return SizedBox(
-      width: compact ? 42 : 50,
-      height: compact ? 42 : 50,
+      width: compact ? 58 : 68,
+      height: compact ? 58 : 68,
       child: SvgPicture.asset(
         'asset/logo.svg',
         colorMapper: _LogoOutlineColorMapper(
@@ -422,12 +433,14 @@ class _NavigationButton extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(
-                  item.icon,
-                  size: compact ? 22 : 27,
-                  color: selected
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                SvgPicture.asset(
+                  item.assetPath,
+                  width: compact ? 22 : 27,
+                  height: compact ? 22 : 27,
+                  colorFilter: ColorFilter.mode(
+                    selected ? colors.primary : colors.onSurfaceVariant,
+                    BlendMode.srcIn,
+                  ),
                 ),
                 SizedBox(width: compact ? 10 : 18),
                 Expanded(
@@ -456,8 +469,8 @@ class _NavigationButton extends StatelessWidget {
 }
 
 class _NavigationItem {
-  const _NavigationItem(this.label, this.icon);
+  const _NavigationItem(this.label, this.assetPath);
 
   final String label;
-  final IconData icon;
+  final String assetPath;
 }

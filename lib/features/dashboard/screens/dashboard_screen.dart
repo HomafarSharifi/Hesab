@@ -14,6 +14,7 @@ class DashboardScreen extends StatefulWidget {
     required this.onAddFunds,
     required this.fromDate,
     required this.toDate,
+    required this.selectedPeriod,
     super.key,
   });
 
@@ -21,6 +22,7 @@ class DashboardScreen extends StatefulWidget {
   final VoidCallback onAddFunds;
   final DateTime fromDate;
   final DateTime? toDate;
+  final int selectedPeriod;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -43,6 +45,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       toDate: widget.toDate,
     );
     final items = await widget.services.catalog.items();
+    final dailyExpenses = await widget.services.reports.expensesByDate(
+      fromDate: widget.fromDate,
+      toDate: widget.toDate,
+    );
     return _DashboardData(
       balanceMinor: wallets.fold<int>(
         0,
@@ -52,14 +58,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       receivedMinor: report.totalReceivedMinor,
       report: report,
       items: items,
+      dailyExpenses: dailyExpenses,
     );
   }
 
   Widget _buildWithData(BuildContext context, _DashboardData? data) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // The design canvas preserves the reference proportions. FittedBox
-        // scales that canvas to the shell's available window without scrolling.
         final stageWidth = math.max(constraints.maxWidth, 1040.0);
         final stageHeight = math.max(constraints.maxHeight, 560.0);
 
@@ -115,6 +120,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               child: ExpenseTrendCard(
                                 monthlyExpenses:
                                     data?.report.expensesByMonth ?? const {},
+                                dailyExpenses: data?.dailyExpenses ?? const {},
+                                fromDate: widget.fromDate,
+                                toDate: widget.toDate,
+                                selectedPeriod: widget.selectedPeriod,
                               ),
                             ),
                             const SizedBox(width: 14),
@@ -156,6 +165,7 @@ class _DashboardData {
     required this.receivedMinor,
     required this.report,
     required this.items,
+    required this.dailyExpenses,
   });
 
   final int balanceMinor;
@@ -163,4 +173,5 @@ class _DashboardData {
   final int receivedMinor;
   final ReportSummary report;
   final List<ItemRecord> items;
+  final Map<String, int> dailyExpenses;
 }

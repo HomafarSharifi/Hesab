@@ -3,7 +3,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 /// Schema changes are append-only. Increment [currentVersion] and add a
 /// migration case whenever the persisted schema changes.
 abstract final class HesabMigrations {
-  static const currentVersion = 2;
+  static const currentVersion = 3;
 
   static Future<void> onCreate(Database database, int version) =>
       migrate(database, fromVersion: 0, toVersion: version);
@@ -30,6 +30,9 @@ abstract final class HesabMigrations {
           break;
         case 2:
           await _migrateVersion2(database);
+          break;
+        case 3:
+          await _migrateVersion3(database);
           break;
         default:
           throw StateError('No Hesab database migration exists for v$version.');
@@ -313,6 +316,56 @@ abstract final class HesabMigrations {
       BEGIN
         SELECT RAISE(ABORT, 'financial_expense_is_immutable');
       END
+    ''');
+  }
+
+  static Future<void> _migrateVersion3(DatabaseExecutor database) async {
+    await database.execute('''
+      CREATE TABLE purchase_wallet_allocation (
+        transaction_id INTEGER NOT NULL,
+        wallet_id INTEGER NOT NULL,
+        amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
+        PRIMARY KEY(transaction_id, wallet_id),
+        FOREIGN KEY(transaction_id) REFERENCES wallet_transaction(transaction_id) ON DELETE RESTRICT,
+        FOREIGN KEY(wallet_id) REFERENCES wallet(wallet_id) ON DELETE RESTRICT
+      )
+    ''');
+    await database.execute('''
+      INSERT INTO purchase_wallet_allocation(transaction_id, wallet_id, amount_minor)
+      SELECT transaction_id, wallet_id, amount_minor
+      FROM wallet_transaction WHERE transaction_type = 'purchase'
+    ''');
+    await database.execute('DROP VIEW wallet_balances');
+    await database.execute('''
+      CREATE VIEW wallet_balances AS
+      SELECT wallet.wallet_id,
+        COALESCE((
+          SELECT SUM(CASE
+            WHEN t.transaction_type IN ('deposit', 'withdrawal') THEN
+              CASE WHEN t.transaction_type = 'deposit' THEN t.amount_minor ELSE -t.amount_minor END
+            WHEN t.transaction_type = 'reversal' AND original.transaction_type <> 'purchase' THEN
+              CASE WHEN original.transaction_type = 'deposit' THEN -t.amount_minor ELSE t.amount_minor END
+            ELSE 0 END)
+          FROM wallet_transaction t
+          LEFT JOIN wallet_transaction original ON original.transaction_id = t.reversal_of_transaction_id
+          WHERE t.wallet_id = wallet.wallet_id
+        ), 0)
+        + COALESCE((
+          SELECT SUM(CASE WHEN EXISTS (
+            SELECT 1 FROM wallet_transaction reversal
+            WHERE reversal.reversal_of_transaction_id = allocation.transaction_id
+          ) THEN 0 ELSE -allocation.amount_minor END)
+          FROM purchase_wallet_allocation allocation
+          WHERE allocation.wallet_id = wallet.wallet_id
+        ), 0)
+        + COALESCE((
+          SELECT SUM(allocation.amount_minor)
+          FROM purchase_wallet_allocation allocation
+          JOIN wallet_transaction reversal
+            ON reversal.reversal_of_transaction_id = allocation.transaction_id
+          WHERE allocation.wallet_id = wallet.wallet_id
+        ), 0) AS balance_minor
+      FROM wallet
     ''');
   }
 }

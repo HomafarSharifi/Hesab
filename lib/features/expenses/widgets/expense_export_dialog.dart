@@ -1,32 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/hesab_theme.dart';
-
-enum ExpenseExportFormat { excel, csv }
-
-class ExpenseExportSelection {
-  ExpenseExportSelection({
-    required this.format,
-    required List<int> pageIndexes,
-    required this.pageSize,
-    required this.expectedTotalCount,
-    required this.search,
-    required this.categoryName,
-    required this.walletId,
-    required this.fromDate,
-    required this.toDate,
-  }) : pageIndexes = List.unmodifiable(pageIndexes);
-
-  final ExpenseExportFormat format;
-  final List<int> pageIndexes;
-  final int pageSize;
-  final int expectedTotalCount;
-  final String? search;
-  final String? categoryName;
-  final int? walletId;
-  final DateTime fromDate;
-  final DateTime? toDate;
-}
+import '../models/expense_export_models.dart';
 
 class ExpenseExportDialog extends StatefulWidget {
   const ExpenseExportDialog({
@@ -63,8 +38,7 @@ class _ExpenseExportDialogState extends State<ExpenseExportDialog> {
   bool _checkingSnapshot = false;
   String? _message;
 
-  int get _pageCount =>
-      (_totalCount + widget.pageSize - 1) ~/ widget.pageSize;
+  int get _pageCount => (_totalCount + widget.pageSize - 1) ~/ widget.pageSize;
 
   int get _selectedRecordCount => _selectedPageIndexes.fold(
     0,
@@ -116,8 +90,7 @@ class _ExpenseExportDialogState extends State<ExpenseExportDialog> {
           _totalCount = latestCount;
           _selectedPageIndexes.removeWhere((page) => page >= _pageCount);
           _checkingSnapshot = false;
-          _message =
-              'معلومات تازه شد؛ صفحه‌ها و شمارش‌ها را بازبینی کنید.';
+          _message = 'معلومات تازه شد؛ صفحه‌ها و شمارش‌ها را بازبینی کنید.';
         });
         return;
       }
@@ -150,7 +123,7 @@ class _ExpenseExportDialogState extends State<ExpenseExportDialog> {
     textDirection: TextDirection.rtl,
     child: AlertDialog(
       scrollable: true,
-      title: const Text('برآمدن مصارف'),
+      title: const Text('خروجی گرفتن مصارف'),
       content: SizedBox(
         width: 480,
         child: Column(
@@ -222,8 +195,8 @@ class _ExpenseExportDialogState extends State<ExpenseExportDialog> {
                       child: const Text('همه صفحه‌ها'),
                     ),
                     TextButton(
-                      onPressed: _selectedPageIndexes.isEmpty ||
-                              _checkingSnapshot
+                      onPressed:
+                          _selectedPageIndexes.isEmpty || _checkingSnapshot
                           ? null
                           : () => setState(() {
                               _selectedPageIndexes.clear();
@@ -298,14 +271,11 @@ class _ExpenseExportDialogState extends State<ExpenseExportDialog> {
         ),
         FilledButton(
           onPressed: _canContinue ? _confirm : null,
-          child: const Text('تأیید صفحه‌ها'),
+          child: const Text('خروجی گرفتن'),
         ),
       ],
     ),
   );
 }
 
-String _dariDigits(int value) => value.toString().replaceAllMapped(
-  RegExp(r'\d'),
-  (match) => String.fromCharCode(match.group(0)!.codeUnitAt(0) + 1728),
-);
+String _dariDigits(int value) => value.toString();

@@ -56,9 +56,29 @@ class _WalletScreenState extends State<WalletScreen> {
     }
   }
 
-  Future<void> _archive(WalletRecord wallet) async {
+  Future<void> _delete(WalletRecord wallet) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف کامل کیف پول'),
+        content: Text(
+          '«${wallet.name}» حذف شود؟ کیف پول دارای تراکنش قابل حذف نیست.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('لغو'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     try {
-      await widget.services.catalog.archiveWallet(wallet.id);
+      await widget.services.catalog.deleteWallet(wallet.id);
       if (mounted) setState(() => _revision++);
     } catch (error) {
       _message(error);
@@ -158,9 +178,9 @@ class _WalletScreenState extends State<WalletScreen> {
                               child: const Text('برداشت'),
                             ),
                             IconButton(
-                              tooltip: 'بایگانی',
-                              onPressed: () => _archive(wallet),
-                              icon: const Icon(Icons.archive_outlined),
+                              tooltip: 'حذف',
+                              onPressed: () => _delete(wallet),
+                              icon: const Icon(Icons.delete_outline),
                             ),
                           ],
                         );

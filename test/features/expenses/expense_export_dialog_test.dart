@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:hesab/features/expenses/models/expense_export_models.dart';
 
 import 'package:hesab/features/expenses/widgets/expense_export_dialog.dart';
 
@@ -46,7 +47,7 @@ void main() {
     await tester.tap(find.text('پاک‌کردن گزینش'));
     await tester.pump();
     final confirmButton = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'تأیید صفحه‌ها'),
+      find.widgetWithText(FilledButton, 'خروجی گرفتن'),
     );
     expect(confirmButton.onPressed, isNull);
 
@@ -56,7 +57,7 @@ void main() {
 
     await tester.tap(find.text('CSV (.csv)'));
     await tester.pump();
-    await tester.tap(find.text('تأیید صفحه‌ها'));
+    await tester.tap(find.text('خروجی گرفتن'));
     await tester.pumpAndSettle();
 
     expect(
@@ -66,7 +67,7 @@ void main() {
     expect(find.text('۴ صفحه، ۱۵۱ مورد'), findsOneWidget);
     expect(find.text('صفحه ۴: ۱۵۱–۱۵۱'), findsOneWidget);
 
-    await tester.tap(find.text('تأیید صفحه‌ها'));
+    await tester.tap(find.text('خروجی گرفتن'));
     await tester.pumpAndSettle();
 
     expect(result, isNotNull);

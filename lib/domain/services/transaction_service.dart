@@ -12,6 +12,31 @@ class TransactionService {
 
   final Database _database;
 
+  Future<void> createWalletWithInitialDeposit({
+    required String walletName,
+    required int amountMinor,
+  }) async {
+    final name = _validateName(walletName, 45, 'نام کیف پول');
+    if (amountMinor <= 0 || amountMinor > AmountCodec.maximumMinorUnits) {
+      throw const AppFailure('مبلغ باید بیشتر از صفر و در محدوده مجاز باشد.');
+    }
+    await _database.transaction((transaction) async {
+      final catalog = CatalogRepository(transaction);
+      final normalizedName = NameNormalizer.normalize(name);
+      if (await catalog.walletNameExists(normalizedName)) {
+        throw const AppFailure('این کیف پول پیش از این ثبت شده است.');
+      }
+      final walletId = await catalog.createWallet(name, normalizedName);
+      await FinancialRepository(transaction).insertTransaction(
+        walletId: walletId,
+        date: _dateOnly(DateTime.now()),
+        type: 'deposit',
+        amountMinor: amountMinor,
+        note: 'موجودی آغازین',
+      );
+    });
+  }
+
   Future<int> deposit({
     required int walletId,
     required DateTime date,
@@ -66,6 +91,7 @@ class TransactionService {
 
   Future<int> purchaseWithNewProduct({
     required int walletId,
+    List<int>? walletIds,
     required String productName,
     required DateTime date,
     required int quantityCenti,
@@ -128,8 +154,102 @@ class TransactionService {
       return _recordPurchase(
         transaction,
         walletId: walletId,
+        walletIds: walletIds,
         itemId: resolvedItemId,
         date: date,
+        quantityCenti: quantityCenti,
+        unitPriceMinor: unitPriceMinor,
+        totalMinor: totalMinor,
+        note: note,
+      );
+    });
+  }
+
+  Future<int> correctPurchaseWithNewProduct({
+    required int originalTransactionId,
+    required int walletId,
+    required String productName,
+    required DateTime correctionDate,
+    required DateTime purchaseDate,
+    required int quantityCenti,
+    required int unitPriceMinor,
+    int? categoryId,
+    String? newCategoryName,
+    int? unitId,
+    String? newUnitName,
+    String? note,
+  }) async {
+    final name = _validateName(productName, 45, 'نام جنس');
+    final normalizedName = NameNormalizer.normalize(name);
+    final totalMinor = AmountCodec.calculatePurchaseTotalMinor(
+      quantityCenti: quantityCenti,
+      unitPriceMinor: unitPriceMinor,
+    );
+
+    return _database.transaction((transaction) async {
+      final financial = FinancialRepository(transaction);
+      final original = await financial.transactionById(originalTransactionId);
+      if (original == null || original['transaction_type'] != 'purchase') {
+        throw const AppFailure('خرید اصلی برای اصلاح معتبر نیست.');
+      }
+      if (await financial.hasReversal(originalTransactionId)) {
+        throw const AppFailure('این خرید پیش از این برگشت داده شده است.');
+      }
+
+      await financial.insertTransaction(
+        walletId: original['wallet_id']! as int,
+        date: _dateOnly(correctionDate),
+        type: 'reversal',
+        amountMinor: original['amount_minor']! as int,
+        note: _cleanNote('برگشت خرید برای اصلاح $originalTransactionId'),
+        reversalOfId: originalTransactionId,
+      );
+
+      final catalog = CatalogRepository(transaction);
+      if (await catalog.activeWallet(walletId) == null) {
+        throw const AppFailure('کیف پول انتخاب‌شده فعال نیست.');
+      }
+      final resolvedCategoryId = await _resolveCategory(
+        catalog,
+        categoryId: categoryId,
+        newName: newCategoryName,
+      );
+      final resolvedUnitId = await _resolveUnit(
+        catalog,
+        unitId: unitId,
+        newName: newUnitName,
+      );
+      final existing = await catalog.activeItemByKey(
+        normalizedName: normalizedName,
+        categoryId: resolvedCategoryId,
+        unitId: resolvedUnitId,
+      );
+      final int resolvedItemId;
+      if (existing != null) {
+        resolvedItemId = existing.id;
+      } else {
+        if (await catalog.itemNameExists(
+          normalizedName: normalizedName,
+          categoryId: resolvedCategoryId,
+          unitId: resolvedUnitId,
+        )) {
+          throw const AppFailure(
+            'جنس هم‌نام در بایگانی موجود است؛ جنس دیگری انتخاب کنید.',
+          );
+        }
+        resolvedItemId = await catalog.createItem(
+          name: name,
+          normalizedName: normalizedName,
+          categoryId: resolvedCategoryId,
+          unitId: resolvedUnitId,
+        );
+      }
+
+      return _recordPurchase(
+        transaction,
+        walletId: walletId,
+        itemId: resolvedItemId,
+        date: purchaseDate,
         quantityCenti: quantityCenti,
         unitPriceMinor: unitPriceMinor,
         totalMinor: totalMinor,
@@ -141,6 +261,7 @@ class TransactionService {
   Future<int> _recordPurchase(
     DatabaseExecutor transaction, {
     required int walletId,
+    List<int>? walletIds,
     required int itemId,
     required DateTime date,
     required int quantityCenti,
@@ -156,8 +277,27 @@ class TransactionService {
       throw const AppFailure('جنس انتخاب‌شده فعال نیست.');
     }
     final financial = FinancialRepository(transaction);
-    if (await financial.balanceMinor(walletId) < totalMinor) {
-      throw const AppFailure('موجودی کیف پول برای این خرید کافی نیست.');
+    final selectedWalletIds = walletIds ?? [walletId];
+    if (selectedWalletIds.isEmpty ||
+        selectedWalletIds.toSet().length != selectedWalletIds.length) {
+      throw const AppFailure('کیف پول‌های انتخاب‌شده معتبر نیستند.');
+    }
+    var remaining = totalMinor;
+    final allocations = <int, int>{};
+    for (final selectedWalletId in selectedWalletIds) {
+      if (await catalog.activeWallet(selectedWalletId) == null) {
+        throw const AppFailure('یکی از کیف پول‌های انتخاب‌شده فعال نیست.');
+      }
+      final available = await financial.balanceMinor(selectedWalletId);
+      final allocated = available < remaining ? available : remaining;
+      if (allocated > 0) allocations[selectedWalletId] = allocated;
+      remaining -= allocated;
+      if (remaining == 0) break;
+    }
+    if (remaining > 0) {
+      throw const AppFailure(
+        'مجموع موجودی کیف پول‌های انتخاب‌شده برای این خرید کافی نیست.',
+      );
     }
     final cleanNote = _cleanNote(note);
     final transactionId = await financial.insertTransaction(
@@ -173,6 +313,10 @@ class TransactionService {
       quantityCenti: quantityCenti,
       unitPriceMinor: unitPriceMinor,
       note: cleanNote,
+    );
+    await financial.insertPurchaseAllocations(
+      transactionId: transactionId,
+      amountsByWallet: allocations,
     );
     return transactionId;
   }

@@ -79,40 +79,6 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                   Row(
                     textDirection: TextDirection.ltr,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: .14),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.contactless_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 9),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'موجودی حساب',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            'کیف پول حساب',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: .72),
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
                       InkWell(
                         onTap: widget.onAddFunds,
                         borderRadius: BorderRadius.circular(20),
@@ -128,11 +94,7 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.add_rounded,
-                                size: 15,
-                                color: colors.onTertiary,
-                              ),
+                              Icon(Icons.add_rounded, size: 15, color: colors.onTertiary),
                               const SizedBox(width: 4),
                               Text(
                                 'وارد کردن پول',
@@ -144,6 +106,40 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                               ),
                             ],
                           ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'کیف پول',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            'شریفی',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: .72),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 9),
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: .14),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.account_balance_wallet_rounded,
+                          color: Colors.white,
+                          size: 18,
                         ),
                       ),
                     ],

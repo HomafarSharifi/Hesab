@@ -42,6 +42,39 @@ class ReportService {
     return totals;
   }
 
+  Future<Map<String, int>> expensesByDate({
+    DateTime? fromDate,
+    DateTime? toDate,
+  }) async {
+    final clauses = <String>[
+      "t.transaction_type = 'purchase'",
+      '''NOT EXISTS (
+      SELECT 1 FROM wallet_transaction reversal
+      WHERE reversal.reversal_of_transaction_id = t.transaction_id
+    )''',
+    ];
+    final args = <Object?>[];
+    if (fromDate != null) {
+      clauses.add('t.transaction_date >= ?');
+      args.add(_dateOnly(fromDate));
+    }
+    if (toDate != null) {
+      clauses.add('t.transaction_date <= ?');
+      args.add(_dateOnly(toDate));
+    }
+    final rows = await _database.rawQuery('''
+      SELECT t.transaction_date, SUM(t.amount_minor) AS amount_minor
+      FROM wallet_transaction t
+      WHERE ${clauses.join(' AND ')}
+      GROUP BY t.transaction_date
+      ORDER BY t.transaction_date
+    ''', args);
+    return {
+      for (final row in rows)
+        row['transaction_date']! as String: row['amount_minor']! as int,
+    };
+  }
+
   Future<ReportSummary> summary({DateTime? fromDate, DateTime? toDate}) async {
     final clauses = <String>[
       "t.transaction_type = 'purchase'",

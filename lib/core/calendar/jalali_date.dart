@@ -125,7 +125,4 @@ class JalaliDate {
   }
 }
 
-String _dariDigits(String value) => value.replaceAllMapped(
-  RegExp(r'\d'),
-  (match) => String.fromCharCode(match.group(0)!.codeUnitAt(0) + 1728),
-);
+String _dariDigits(String value) => value;
