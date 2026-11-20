@@ -99,7 +99,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       if (input == null) return;
       await widget.services.transactions.purchaseWithNewProduct(
         walletId: input.walletId,
-        walletIds: input.walletIds,
         productName: input.productName,
         categoryId: input.categoryId,
         newCategoryName: input.newCategoryName,
@@ -656,206 +655,154 @@ class _ExpensesTable extends StatelessWidget {
         const outerHorizontalPadding = 12.0;
         const indexWidth = 28.0;
         const actionsWidth = 108.0;
-        const columnFlexes = <double>[12, 18, 12, 11, 11, 11];
-        final availableWidth =
-            (constraints.maxWidth -
-                    outerHorizontalPadding * 2 -
-                    indexWidth -
-                    actionsWidth)
-                .clamp(0.0, double.infinity);
-        final totalFlex = columnFlexes.fold<double>(
-          0,
-          (sum, flex) => sum + flex,
-        );
-        final columnWidths = columnFlexes
-            .map((flex) => availableWidth * flex / totalFlex)
-            .toList(growable: false);
-        final rulePositions = <double>[
-          constraints.maxWidth - outerHorizontalPadding - indexWidth,
-        ];
-        var right = rulePositions.first;
-        for (final width in columnWidths) {
-          right -= width;
-          rulePositions.add(right);
+        const ruleFlexes = <double>[12, 18, 12, 12, 11, 11, 11];
+        final contentWidth = constraints.maxWidth - outerHorizontalPadding * 2;
+        final flexibleWidth = contentWidth - indexWidth - actionsWidth;
+        final totalFlex = ruleFlexes.fold<double>(0, (sum, flex) => sum + flex);
+        final ruleWidths = ruleFlexes
+            .map((flex) => flexibleWidth * flex / totalFlex)
+            .toList();
+        final rulePositions = <double>[];
+        var currentRight =
+            constraints.maxWidth - outerHorizontalPadding - indexWidth;
+
+        for (final width in ruleWidths) {
+          rulePositions.add(currentRight);
+          currentRight -= width;
         }
         return Stack(
           children: [
             Column(
-              children: [
-                Container(
-                  color: HesabTheme.selectionSurface(context),
-                  padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 12, 6),
+      children: [
+        Container(
+          color: HesabTheme.selectionSurface(context),
+          padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 12, 6),
+          child: Row(
+            children: [
+              SizedBox(width: 28, child: _HeaderCell('#')),
+              Expanded(flex: 12, child: _HeaderCell('تاریخ')),
+              Expanded(flex: 18, child: _HeaderCell('جنس')),
+              Expanded(flex: 12, child: _HeaderCell('دسته‌بندی')),
+              Expanded(flex: 11, child: _HeaderCell('کیف پول')),
+              Expanded(flex: 11, child: _HeaderCell('مقدار')),
+              Expanded(flex: 11, child: _HeaderCell('مجموع')),
+              SizedBox(width: 108, child: Text('عملیات')),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.separated(
+            itemCount: expenses.length,
+            separatorBuilder: (context, index) =>
+                Divider(height: 1, color: Theme.of(context).dividerColor),
+            itemBuilder: (context, index) {
+              final expense = expenses[index];
+              return ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 40),
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(12, 2, 12, 2),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      SizedBox(width: indexWidth, child: _HeaderCell('#')),
-                      for (var i = 0; i < columnWidths.length; i++)
-                        SizedBox(
-                          width: columnWidths[i],
-                          child: _HeaderCell(
-                            [
-                              'تاریخ',
-                              'جنس',
-                              'دسته‌بندی',
-                              'کیف پول',
-                              'مقدار',
-                              'مجموع',
-                            ][i],
+                      SizedBox(
+                        width: 28,
+                        child: _PaddedCell(
+                          child: _CellText(
+                          _dariDigits(pageIndex * pageSize + index + 1),
                           ),
                         ),
+                      ),
+                      Expanded(
+                        flex: 12,
+                        child: _PaddedCell(child: _CellText(dateLabel(expense.date))),
+                      ),
+                      Expanded(
+                        flex: 18,
+                        child: _PaddedCell(child: _CellText(expense.itemName, strong: true)),
+                      ),
+                      Expanded(
+                        flex: 12,
+                        child: _PaddedCell(child: _CellText(expense.categoryName)),
+                      ),
+                      Expanded(flex: 11, child: _PaddedCell(child: _CellText(expense.walletName))),
+                      Expanded(
+                        flex: 11,
+                        child: _PaddedCell(child: _CellText(
+                          '${AmountCodec.formatQuantityCenti(expense.quantityCenti)} ${expense.unitName}',
+                        )),
+                      ),
+                      Expanded(
+                        flex: 11,
+                        child: _PaddedCell(child: _CellText(
+                          AmountCodec.formatMoneyMinor(expense.amountMinor),
+                          strong: true,
+                        )),
+                      ),
                       SizedBox(
-                        width: actionsWidth,
-                        child: _HeaderCell('عملیات'),
+                        width: 108,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (!expense.isReversed)
+                              IconButton(
+                                tooltip: 'ویرایش خرید',
+                                visualDensity: VisualDensity.compact,
+                                iconSize: 17,
+                                constraints: const BoxConstraints.tightFor(
+                                  width: 36,
+                                  height: 36,
+                                ),
+                                onPressed: () => onEdit(expense),
+                                icon: const Icon(Icons.edit_outlined),
+                              ),
+                            IconButton(
+                              tooltip: 'جزئیات',
+                              visualDensity: VisualDensity.compact,
+                              iconSize: 17,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 36,
+                                height: 36,
+                              ),
+                              onPressed: () => onDetails(expense),
+                              icon: const Icon(Icons.info_outline_rounded),
+                            ),
+                            if (expense.isReversed)
+                              Icon(
+                                Icons.check_circle_outline_rounded,
+                                size: 17,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              )
+                            else
+                              IconButton(
+                                tooltip: 'برگشت خرید',
+                                visualDensity: VisualDensity.compact,
+                                iconSize: 17,
+                                constraints: const BoxConstraints.tightFor(
+                                  width: 36,
+                                  height: 36,
+                                ),
+                                onPressed: () => onReverse(expense),
+                                icon: const Icon(Icons.undo_rounded),
+                              ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: expenses.length,
-                    separatorBuilder: (context, index) => Divider(
-                      height: 1,
-                      color: Theme.of(context).dividerColor,
-                    ),
-                    itemBuilder: (context, index) {
-                      final expense = expenses[index];
-                      return ConstrainedBox(
-                        constraints: const BoxConstraints(minHeight: 40),
-                        child: Padding(
-                          padding: const EdgeInsetsDirectional.fromSTEB(
-                            12,
-                            2,
-                            12,
-                            2,
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: indexWidth,
-                                child: _PaddedCell(
-                                  child: _CellText(
-                                    _dariDigits(
-                                      pageIndex * pageSize + index + 1,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(
-                                width: columnWidths[0],
-                                child: _PaddedCell(
-                                  child: _CellText(dateLabel(expense.date)),
-                                ),
-                              ),
-                              SizedBox(
-                                width: columnWidths[1],
-                                child: _PaddedCell(
-                                  child: _CellText(
-                                    expense.itemName,
-                                    strong: true,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(
-                                width: columnWidths[2],
-                                child: _PaddedCell(
-                                  child: _CellText(expense.categoryName),
-                                ),
-                              ),
-                              SizedBox(
-                                width: columnWidths[3],
-                                child: _PaddedCell(
-                                  child: _CellText(expense.walletName),
-                                ),
-                              ),
-                              SizedBox(
-                                width: columnWidths[4],
-                                child: _PaddedCell(
-                                  child: _CellText(
-                                    '${AmountCodec.formatQuantityCenti(expense.quantityCenti)} ${expense.unitName}',
-                                  ),
-                                ),
-                              ),
-                              SizedBox(
-                                width: columnWidths[5],
-                                child: _PaddedCell(
-                                  child: _CellText(
-                                    AmountCodec.formatMoneyMinor(
-                                      expense.amountMinor,
-                                    ),
-                                    strong: true,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(
-                                width: actionsWidth,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (!expense.isReversed)
-                                      IconButton(
-                                        tooltip: 'ویرایش خرید',
-                                        visualDensity: VisualDensity.compact,
-                                        iconSize: 17,
-                                        constraints:
-                                            const BoxConstraints.tightFor(
-                                              width: 36,
-                                              height: 36,
-                                            ),
-                                        onPressed: () => onEdit(expense),
-                                        icon: const Icon(Icons.edit_outlined),
-                                      ),
-                                    IconButton(
-                                      tooltip: 'جزئیات',
-                                      visualDensity: VisualDensity.compact,
-                                      iconSize: 17,
-                                      constraints:
-                                          const BoxConstraints.tightFor(
-                                            width: 36,
-                                            height: 36,
-                                          ),
-                                      onPressed: () => onDetails(expense),
-                                      icon: const Icon(
-                                        Icons.info_outline_rounded,
-                                      ),
-                                    ),
-                                    if (expense.isReversed)
-                                      Icon(
-                                        Icons.check_circle_outline_rounded,
-                                        size: 17,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      )
-                                    else
-                                      IconButton(
-                                        tooltip: 'برگشت خرید',
-                                        visualDensity: VisualDensity.compact,
-                                        iconSize: 17,
-                                        constraints:
-                                            const BoxConstraints.tightFor(
-                                              width: 36,
-                                              height: 36,
-                                            ),
-                                        onPressed: () => onReverse(expense),
-                                        icon: const Icon(Icons.undo_rounded),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                _ExpensePaginationBar(
-                  pageIndex: pageIndex,
-                  pageCount: pageCount,
-                  onPreviousPage: onPreviousPage,
-                  onNextPage: onNextPage,
-                ),
-              ],
+              );
+            },
+          ),
+        ),
+        _ExpensePaginationBar(
+          pageIndex: pageIndex,
+          pageCount: pageCount,
+          onPreviousPage: onPreviousPage,
+          onNextPage: onNextPage,
+        ),
+      ],
             ),
             Positioned.fill(
               child: IgnorePointer(
@@ -875,10 +822,7 @@ class _ExpensesTable extends StatelessWidget {
 }
 
 class _ExpenseTableRulesPainter extends CustomPainter {
-  const _ExpenseTableRulesPainter({
-    required this.positions,
-    required this.color,
-  });
+  const _ExpenseTableRulesPainter({required this.positions, required this.color});
   final List<double> positions;
   final Color color;
 
@@ -943,7 +887,10 @@ class _ExpensePaginationBar extends StatelessWidget {
   );
 }
 
-String _dariDigits(int value) => value.toString();
+String _dariDigits(int value) => value.toString().replaceAllMapped(
+  RegExp(r'\d'),
+  (match) => String.fromCharCode(match.group(0)!.codeUnitAt(0) + 1728),
+);
 
 class _CellText extends StatelessWidget {
   const _CellText(this.value, {this.strong = false});
@@ -972,7 +919,7 @@ class _HeaderCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsetsDirectional.symmetric(horizontal: 8),
-    child: Text(label, textAlign: TextAlign.center),
+    child: Text(label),
   );
 }
 
@@ -990,7 +937,6 @@ class _PaddedCell extends StatelessWidget {
 class _PurchaseInput {
   const _PurchaseInput({
     required this.walletId,
-    required this.walletIds,
     required this.productName,
     required this.categoryId,
     required this.newCategoryName,
@@ -1003,7 +949,6 @@ class _PurchaseInput {
   });
 
   final int walletId;
-  final List<int> walletIds;
   final String productName;
   final int? categoryId;
   final String? newCategoryName;
@@ -1039,10 +984,7 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
   final _quantity = TextEditingController(text: '1');
   final _price = TextEditingController();
   final _note = TextEditingController();
-  final List<int> _walletIds = [];
-  late final List<WalletRecord> _availableWallets = widget.wallets
-      .where((wallet) => wallet.balanceMinor > 0)
-      .toList();
+  int? _walletId;
   int? _categoryChoice;
   int? _unitChoice;
   ItemRecord? _selectedItem;
@@ -1054,16 +996,11 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
   void initState() {
     super.initState();
     final expense = widget.initialExpense;
-    if (expense == null) {
-      if (_availableWallets.isNotEmpty) {
-        _walletIds.add(_availableWallets.first.id);
-      }
-      return;
-    }
+    if (expense == null) return;
 
-    if (_availableWallets.any((wallet) => wallet.id == expense.walletId)) {
-      _walletIds.add(expense.walletId);
-    }
+    _walletId = widget.wallets.any((wallet) => wallet.id == expense.walletId)
+        ? expense.walletId
+        : null;
     _name.text = expense.itemName;
     _quantity.text = AmountCodec.formatQuantityCenti(expense.quantityCenti);
     _price.text = AmountCodec.formatMoneyMinor(expense.unitPriceMinor)
@@ -1170,13 +1107,12 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
 
   void _submit() {
     final productName = _name.text.trim();
-    if (_walletIds.isEmpty || productName.isEmpty) return;
+    if (_walletId == null || productName.isEmpty) return;
     if (_categoryChoice == null || _unitChoice == null) return;
     Navigator.pop(
       context,
       _PurchaseInput(
-        walletId: _walletIds.first,
-        walletIds: List.unmodifiable(_walletIds),
+        walletId: _walletId!,
         productName: productName,
         categoryId: _categoryChoice == -1 ? null : _categoryChoice,
         newCategoryName: _newCategoryName,
@@ -1197,7 +1133,7 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
     final total = _totalMinor;
     final selectedProduct = _selectedItem != null;
     final canSave =
-        _walletIds.isNotEmpty &&
+        _walletId != null &&
         _name.text.trim().isNotEmpty &&
         _categoryChoice != null &&
         _unitChoice != null &&
@@ -1219,7 +1155,7 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
                 children: [
                   _responsivePair(
                     _dateButton(),
-                    _walletSelector(),
+                    _walletDropdown(),
                     narrow: narrow,
                   ),
                   const SizedBox(height: 10),
@@ -1382,67 +1318,23 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
     ),
   );
 
-  Widget _walletSelector() {
-    final selected = _availableWallets
-        .where((wallet) => _walletIds.contains(wallet.id))
-        .toList();
-    final label = selected.isEmpty
-        ? 'کیف پول را انتخاب کنید'
-        : selected.length == 1
-        ? selected.first.name
-        : '${selected.first.name} و ${selected.length - 1} کیف پول دیگر';
-    return MenuAnchor(
-      menuChildren: [
-        Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 12, 4),
-          child: Text(
-            'انتخاب کیف پول‌ها به ترتیب برداشت',
-            style: Theme.of(context).textTheme.labelMedium,
+  Widget _walletDropdown() => DropdownButtonFormField<int>(
+    initialValue: _walletId,
+    isExpanded: true,
+    decoration: const InputDecoration(
+      labelText: 'کیف پول',
+      border: OutlineInputBorder(),
+    ),
+    items: widget.wallets
+        .map(
+          (wallet) => DropdownMenuItem(
+            value: wallet.id,
+            child: Text(wallet.name, overflow: TextOverflow.ellipsis),
           ),
-        ),
-        SizedBox(
-          width: 280,
-          height: (_availableWallets.length * 56.0).clamp(56, 6 * 56),
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              for (final wallet in _availableWallets)
-                CheckboxListTile(
-                  dense: true,
-                  title: Text(wallet.name),
-                  subtitle: Text(
-                    AmountCodec.formatMoneyMinor(wallet.balanceMinor),
-                  ),
-                  value: _walletIds.contains(wallet.id),
-                  onChanged: (value) => setState(() {
-                    if (value == true) {
-                      _walletIds.add(wallet.id);
-                    } else {
-                      _walletIds.remove(wallet.id);
-                    }
-                  }),
-                ),
-            ],
-          ),
-        ),
-      ],
-      builder: (context, controller, child) => OutlinedButton(
-        onPressed: controller.isOpen ? controller.close : controller.open,
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsetsDirectional.fromSTEB(12, 12, 12, 12),
-          alignment: AlignmentDirectional.centerStart,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
-            const Icon(Icons.keyboard_arrow_down_rounded),
-          ],
-        ),
-      ),
-    );
-  }
+        )
+        .toList(),
+    onChanged: (value) => setState(() => _walletId = value),
+  );
 
   Widget _categoryDropdown({required bool enabled}) =>
       DropdownButtonFormField<int>(
