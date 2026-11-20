@@ -202,7 +202,7 @@ class _ExpenseExportDialogState extends State<ExpenseExportDialog> {
                               _selectedPageIndexes.clear();
                               _message = null;
                             }),
-                      child: const Text('پاک‌کردن گزینش'),
+                      child: const Text('پاک‌کردن انتخاب'),
                     ),
                   ],
                 ),
@@ -246,7 +246,7 @@ class _ExpenseExportDialogState extends State<ExpenseExportDialog> {
               ),
             const SizedBox(height: 8),
             Text(
-              'گزینش‌شده: ${_dariDigits(_selectedPageIndexes.length)} صفحه، '
+              'انتخاب‌شده: ${_dariDigits(_selectedPageIndexes.length)} صفحه، '
               '${_dariDigits(_selectedRecordCount)} مورد',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),

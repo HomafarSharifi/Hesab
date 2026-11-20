@@ -84,46 +84,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Expanded(
                         flex: 48,
                         child: Row(
-                          textDirection: TextDirection.ltr,
+                          textDirection: TextDirection.rtl,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Expanded(
-                              flex: 37,
+                              flex: 28,
                               child: WalletSummaryCard(
                                 onAddFunds: widget.onAddFunds,
                                 balanceMinor: data?.balanceMinor,
                                 spentMinor: data?.spentMinor,
                                 receivedMinor: data?.receivedMinor,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              flex: 63,
-                              child: ItemExpenseTrendCard(
-                                items: data?.items ?? const [],
-                                loadMonthlyExpenses:
-                                    widget.services.reports.itemExpensesByMonth,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Expanded(
-                        flex: 52,
-                        child: Row(
-                          textDirection: TextDirection.ltr,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              flex: 40,
-                              child: ExpenseTrendCard(
-                                monthlyExpenses:
-                                    data?.report.expensesByMonth ?? const {},
-                                dailyExpenses: data?.dailyExpenses ?? const {},
-                                fromDate: widget.fromDate,
-                                toDate: widget.toDate,
-                                selectedPeriod: widget.selectedPeriod,
                               ),
                             ),
                             const SizedBox(width: 14),
@@ -140,8 +110,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             const SizedBox(width: 14),
                             Expanded(
-                              flex: 28,
+                              flex: 40,
+                              child: ExpenseTrendCard(
+                                monthlyExpenses:
+                                    data?.report.expensesByMonth ?? const {},
+                                dailyExpenses: data?.dailyExpenses ?? const {},
+                                fromDate: widget.fromDate,
+                                toDate: widget.toDate,
+                                selectedPeriod: widget.selectedPeriod,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Expanded(
+                        flex: 52,
+                        child: Row(
+                          textDirection: TextDirection.rtl,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              flex: 32,
                               child: ExpenseSummaryCard(summary: data?.report),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              flex: 68,
+                              child: ItemExpenseTrendCard(
+                                items: data?.items ?? const [],
+                                loadMonthlyExpenses:
+                                    widget.services.reports.itemExpensesByMonth,
+                              ),
                             ),
                           ],
                         ),

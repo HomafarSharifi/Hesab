@@ -4,7 +4,7 @@
 
 Hesab opens one SQLite database at startup and keeps the connection for the app session. On Windows, the file is stored at `%LOCALAPPDATA%/Hesab/hesab.sqlite3`, outside the repository and in local per-user app data. `sqflite_common_ffi` supplies the sqflite API backed by bundled SQLite for Windows desktop.
 
-The database is initialized by `HesabDatabase`. It enables and checks SQLite foreign-key enforcement on every opened connection. Version upgrades are append-only in `HesabMigrations`; the current schema version is 2. Never edit a migration that has shipped. Add a new numbered migration and raise `currentVersion` instead.
+The database is initialized by `HesabDatabase`. It enables and checks SQLite foreign-key enforcement on every opened connection. Version upgrades are append-only in `HesabMigrations`; the current schema version is 3. Never edit a migration that has shipped. Add a new numbered migration and raise `currentVersion` instead.
 
 ## Version 1 schema and later changes
 
@@ -34,4 +34,4 @@ SQLite cannot express a cross-table requirement that every purchase has at least
 
 ## Known boundaries
 
-Repositories, local name normalization, validation, financial services, reversals, and database tests now sit above the migration layer. Report import/export and validated backup/restore remain future work. Transaction dates are accepted as Dart `DateTime` values and stored as ISO Gregorian calendar dates; dashboard period selection converts Afghan Jalali dates at the service boundary. Keep all SQL parameterized in repositories and never run SQL from widgets.
+Repositories, local name normalization, validation, financial services, and reversals sit above the migration layer. Settings can create a consistent SQLite snapshot, validate and restore a selected backup, or reset the database. Restore checks the schema version, required Hesab tables, foreign-key consistency, and SQLite integrity before replacing the active file. The prior database is retained as a rollback copy until the replacement opens successfully. Transaction dates are accepted as Dart `DateTime` values and stored as ISO Gregorian calendar dates; dashboard period selection converts Afghan Jalali dates at the service boundary. Keep all SQL parameterized in repositories and never run SQL from widgets.

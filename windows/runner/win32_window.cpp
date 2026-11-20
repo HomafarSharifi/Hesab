@@ -18,6 +18,11 @@ namespace {
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 
+// Minimum outer-window dimensions in logical pixels. Keep these aligned with
+// ResponsiveDimensions in lib/core/layout/responsive_dimensions.dart.
+constexpr int kMinimumWindowWidth = 900;
+constexpr int kMinimumWindowHeight = 640;
+
 /// Registry key for app theme preference.
 ///
 /// A value of 0 indicates apps should use dark mode. A non-zero or missing
@@ -179,6 +184,14 @@ Win32Window::MessageHandler(HWND hwnd,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_GETMINMAXINFO: {
+      auto info = reinterpret_cast<MINMAXINFO*>(lparam);
+      const UINT dpi = GetDpiForWindow(hwnd);
+      const double scale_factor = dpi / 96.0;
+      info->ptMinTrackSize.x = Scale(kMinimumWindowWidth, scale_factor);
+      info->ptMinTrackSize.y = Scale(kMinimumWindowHeight, scale_factor);
+      return 0;
+    }
     case WM_DESTROY:
       window_handle_ = nullptr;
       Destroy();

@@ -45,11 +45,17 @@ class CatalogRepository {
     );
   }
 
-  Future<void> updateCategory(int id, String name, String normalizedName) async {
-    await _database.update('category', {
-      'category_name': name,
-      'normalized_name': normalizedName,
-    }, where: 'category_id = ?', whereArgs: [id]);
+  Future<void> updateCategory(
+    int id,
+    String name,
+    String normalizedName,
+  ) async {
+    await _database.update(
+      'category',
+      {'category_name': name, 'normalized_name': normalizedName},
+      where: 'category_id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<bool> activeCategoryExists(int id) async =>
@@ -89,10 +95,12 @@ class CatalogRepository {
   }
 
   Future<void> updateUnit(int id, String name, String normalizedName) async {
-    await _database.update('unit', {
-      'unit_name': name,
-      'normalized_name': normalizedName,
-    }, where: 'unit_id = ?', whereArgs: [id]);
+    await _database.update(
+      'unit',
+      {'unit_name': name, 'normalized_name': normalizedName},
+      where: 'unit_id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<bool> activeUnitExists(int id) async =>
@@ -224,14 +232,21 @@ class CatalogRepository {
     required int unitId,
   }) async {
     if (await _referenceCount('expense', 'item_id', id) > 0) {
-      throw const AppFailure('این جنس سابقه خرید دارد و برای حفظ تاریخچه ویرایش نمی‌شود.');
+      throw const AppFailure(
+        'این جنس سابقه خرید دارد و برای حفظ تاریخچه ویرایش نمی‌شود.',
+      );
     }
-    await _database.update('item', {
-      'item_name': name,
-      'normalized_name': normalizedName,
-      'category_id': categoryId,
-      'unit_id': unitId,
-    }, where: 'item_id = ?', whereArgs: [id]);
+    await _database.update(
+      'item',
+      {
+        'item_name': name,
+        'normalized_name': normalizedName,
+        'category_id': categoryId,
+        'unit_id': unitId,
+      },
+      where: 'item_id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<bool> categoryNameExists(String normalizedName) async =>
@@ -267,11 +282,13 @@ class CatalogRepository {
 
   Future<List<WalletRecord>> wallets({bool includeArchived = false}) async {
     final rows = await _database.rawQuery('''
-      SELECT w.wallet_id, w.wallet_name, w.archived_at, b.balance_minor
+      SELECT w.wallet_id, w.wallet_name, w.archived_at, b.balance_minor,
+        (SELECT COUNT(*) FROM purchase_wallet_allocation a
+         WHERE a.wallet_id = w.wallet_id) AS purchase_count
       FROM wallet w
       JOIN wallet_balances b ON b.wallet_id = w.wallet_id
       ${includeArchived ? '' : 'WHERE w.archived_at IS NULL'}
-      ORDER BY w.wallet_name COLLATE NOCASE
+      ORDER BY purchase_count DESC, w.wallet_name COLLATE NOCASE
       ''');
     return rows.map(WalletRecord.fromMap).toList();
   }
@@ -314,12 +331,16 @@ class CatalogRepository {
 
   Future<void> updateWallet(int id, String name, String normalizedName) async {
     if (await _referenceCount('wallet_transaction', 'wallet_id', id) > 0) {
-      throw const AppFailure('این کیف پول سابقه تراکنش دارد و برای حفظ تاریخچه ویرایش نمی‌شود.');
+      throw const AppFailure(
+        'این کیف پول سابقه تراکنش دارد و برای حفظ تاریخچه ویرایش نمی‌شود.',
+      );
     }
-    await _database.update('wallet', {
-      'wallet_name': name,
-      'normalized_name': normalizedName,
-    }, where: 'wallet_id = ?', whereArgs: [id]);
+    await _database.update(
+      'wallet',
+      {'wallet_name': name, 'normalized_name': normalizedName},
+      where: 'wallet_id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> _referenceCount(String table, String column, int id) async =>

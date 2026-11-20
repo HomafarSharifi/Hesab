@@ -722,10 +722,6 @@ class _ReferenceCategoryBreakdownCardState
 
     final inactiveGray =
         isDark ? const Color(0xFF424E48) : const Color(0xFF9EA09F);
-    final innerFill =
-        isDark ? const Color(0xFF1A2621) : const Color(0xFFF7F7F7);
-    final innerBorder =
-        isDark ? const Color(0xFF283932) : const Color(0xFFECEEEE);
     final accentReadable = isDark ? _kActiveLime : _kActiveGreenText;
 
     final largest =
@@ -821,8 +817,6 @@ class _ReferenceCategoryBreakdownCardState
                                     activeIndex: activeIndex,
                                     activeColor: _kActiveLime,
                                     inactiveColor: inactiveGray,
-                                    innerFillColor: innerFill,
-                                    innerBorderColor: innerBorder,
                                   ),
                                 ),
                                 Padding(
@@ -838,7 +832,7 @@ class _ReferenceCategoryBreakdownCardState
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           color: colors.onSurface,
-                                          fontSize: 11,
+                                          fontSize: 9,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -851,7 +845,7 @@ class _ReferenceCategoryBreakdownCardState
                                           ),
                                           style: TextStyle(
                                             color: colors.onSurface,
-                                            fontSize: 14,
+                                            fontSize: 11,
                                             fontWeight: FontWeight.w800,
                                           ),
                                         ),
@@ -863,7 +857,7 @@ class _ReferenceCategoryBreakdownCardState
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             color: accentReadable,
-                                            fontSize: 8.5,
+                                          fontSize: 7,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
@@ -889,7 +883,7 @@ class _ReferenceCategoryBreakdownCardState
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: colors.onSurfaceVariant,
-                              fontSize: 9,
+                              fontSize: 8,
                             ),
                           ),
                         )
@@ -930,16 +924,12 @@ class _ReferenceDonutPainter extends CustomPainter {
     required this.activeIndex,
     this.activeColor = const Color(0xFF7FDF3C),
     this.inactiveColor = const Color(0xFF9EA09F),
-    this.innerFillColor = const Color(0xFFF7F7F7),
-    this.innerBorderColor = const Color(0xFFECEEEE),
   });
 
   final List<int> values;
   final int activeIndex;
   final Color activeColor;
   final Color inactiveColor;
-  final Color innerFillColor;
-  final Color innerBorderColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -948,18 +938,6 @@ class _ReferenceDonutPainter extends CustomPainter {
     final outerR = size.shortestSide / 2 - 4;
     final innerR = outerR * 0.59;
     final gapPx = math.max(2.6, outerR * 0.028);
-
-    // Soft inner circle (#F7F7F7) separated by a crisp gap from the ring
-    final discR = math.max(0.0, innerR - gapPx);
-    canvas.drawCircle(center, discR, Paint()..color = innerFillColor);
-    canvas.drawCircle(
-      center,
-      discR,
-      Paint()
-        ..color = innerBorderColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0,
-    );
 
     if (values.isEmpty || total <= 0) {
       final emptyRing = Path()
@@ -1110,8 +1088,7 @@ class _ReferenceDonutPainter extends CustomPainter {
       oldDelegate.values != values ||
       oldDelegate.activeIndex != activeIndex ||
       oldDelegate.activeColor != activeColor ||
-      oldDelegate.inactiveColor != inactiveColor ||
-      oldDelegate.innerFillColor != innerFillColor;
+      oldDelegate.inactiveColor != inactiveColor;
 }
 
 class _CategoryShareBadge extends StatelessWidget {

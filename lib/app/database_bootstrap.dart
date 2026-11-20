@@ -22,6 +22,10 @@ class _DatabaseBootstrapState extends State<DatabaseBootstrap> {
     _database = HesabDatabase.instance.database;
   }
 
+  void _onDatabaseChanged() {
+    setState(() => _database = HesabDatabase.instance.database);
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Database>(
@@ -33,7 +37,10 @@ class _DatabaseBootstrapState extends State<DatabaseBootstrap> {
         if (snapshot.connectionState != ConnectionState.done) {
           return const _DatabaseLoadingApp();
         }
-        return HesabApp(services: HesabServices(snapshot.data!));
+        return HesabApp(
+          services: HesabServices(snapshot.data!),
+          onDatabaseChanged: _onDatabaseChanged,
+        );
       },
     );
   }

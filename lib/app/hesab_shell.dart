@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/calendar/jalali_date.dart';
+import '../core/layout/responsive_dimensions.dart';
 import '../core/theme/hesab_theme.dart';
 import '../features/dashboard/screens/dashboard_screen.dart';
 import '../features/expenses/screens/expenses_screen.dart';
@@ -16,12 +17,14 @@ import 'hesab_services.dart';
 class HesabShell extends StatefulWidget {
   const HesabShell({
     required this.services,
+    required this.onDatabaseChanged,
     required this.onToggleTheme,
     required this.isDarkMode,
     super.key,
   });
 
   final HesabServices services;
+  final VoidCallback onDatabaseChanged;
   final VoidCallback onToggleTheme;
   final bool isDarkMode;
 
@@ -99,60 +102,41 @@ class _HesabShellState extends State<HesabShell> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final compactLayout = constraints.maxWidth < 900;
-            final sidebarWidth = (constraints.maxWidth * 0.22)
-                .clamp(220.0, 320.0)
-                .toDouble();
+            final collapsedSidebar =
+                constraints.maxWidth <
+                ResponsiveDimensions.expandedNavigationBreakpoint;
+            final sidebarWidth = collapsedSidebar ? 82.0 : 280.0;
             final contentWidth = constraints.maxWidth - sidebarWidth;
-            final headerHorizontalPadding =
-                ((compactLayout ? constraints.maxWidth : contentWidth) * 0.045)
-                    .clamp(compactLayout ? 12.0 : 18.0, 64.0)
-                    .toDouble();
+            final headerHorizontalPadding = (contentWidth * 0.045)
+                .clamp(18.0, 64.0)
+                .toDouble();
             return Directionality(
               textDirection: TextDirection.ltr,
-              child: compactLayout
-                  ? Column(
-                      children: [
-                        Expanded(
-                          child: _buildContent(
-                            context,
-                            headerHorizontalPadding,
-                          ),
-                        ),
-                        _CompactNavigation(
-                          items: _navigationItems,
-                          selectedIndex: _selectedIndex,
-                          onSelect: _selectPage,
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        Expanded(
-                          child: _buildContent(
-                            context,
-                            headerHorizontalPadding,
-                          ),
-                        ),
-                        SizedBox(
-                          width: sidebarWidth,
-                          child: Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(
-                              0,
-                              18,
-                              18,
-                              18,
-                            ),
-                            child: _Sidebar(
-                              selectedIndex: _selectedIndex,
-                              items: _navigationItems,
-                              onSelect: _selectPage,
-                              onNewExpense: _startNewExpense,
-                            ),
-                          ),
-                        ),
-                      ],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildContent(context, headerHorizontalPadding),
+                  ),
+                  SizedBox(
+                    width: sidebarWidth,
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(
+                        0,
+                        collapsedSidebar ? 8 : 18,
+                        collapsedSidebar ? 8 : 18,
+                        collapsedSidebar ? 8 : 18,
+                      ),
+                      child: _Sidebar(
+                        selectedIndex: _selectedIndex,
+                        items: _navigationItems,
+                        onSelect: _selectPage,
+                        onNewExpense: _startNewExpense,
+                        iconOnly: collapsedSidebar,
+                      ),
                     ),
+                  ),
+                ],
+              ),
             );
           },
         ),
@@ -208,75 +192,13 @@ class _HesabShellState extends State<HesabShell> {
                 toDate: _periodTo,
               ),
               _ => SettingsScreen(
-                isDarkMode: widget.isDarkMode,
-                onToggleTheme: widget.onToggleTheme,
+                services: widget.services,
+                onDatabaseChanged: widget.onDatabaseChanged,
               ),
             },
           ),
         ],
       );
-}
-
-class _CompactNavigation extends StatelessWidget {
-  const _CompactNavigation({
-    required this.items,
-    required this.selectedIndex,
-    required this.onSelect,
-  });
-
-  final List<_NavigationItem> items;
-  final int selectedIndex;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: Theme.of(context).colorScheme.surface,
-    child: SafeArea(
-      top: false,
-      child: SizedBox(
-        height: 64,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (var index = 0; index < items.length; index++)
-                SizedBox(
-                  width: 76,
-                  child: InkWell(
-                    onTap: () => onSelect(index),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SvgPicture.asset(
-                          items[index].assetPath,
-                          width: 21,
-                          height: 21,
-                          colorFilter: ColorFilter.mode(
-                            index == selectedIndex
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                            BlendMode.srcIn,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          items[index].label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
 }
 
 class _Sidebar extends StatelessWidget {
@@ -285,12 +207,14 @@ class _Sidebar extends StatelessWidget {
     required this.items,
     required this.onSelect,
     required this.onNewExpense,
+    required this.iconOnly,
   });
 
   final int selectedIndex;
   final List<_NavigationItem> items;
   final ValueChanged<int> onSelect;
   final VoidCallback onNewExpense;
+  final bool iconOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -313,41 +237,54 @@ class _Sidebar extends StatelessWidget {
                     : const EdgeInsetsDirectional.fromSTEB(16, 18, 16, 16),
                 child: Column(
                   children: [
-                    _HesabMark(compact: compact),
-                    SizedBox(height: compact ? 10 : 18),
-                    SizedBox(
-                      width: double.infinity,
-                      height: compact ? 48 : HesabTheme.sidebarActionHeight,
-                      child: FilledButton.icon(
-                        onPressed: onNewExpense,
-                        icon: Icon(Icons.add_rounded, size: compact ? 21 : 26),
-                        label: Text(
-                          'ثبت مصرف',
-                          style: TextStyle(
-                            fontSize: compact
-                                ? HesabTheme.fontBody
-                                : HesabTheme.fontControl,
-                            fontWeight: FontWeight.w700,
-                          ),
+                    if (!iconOnly) _HesabMark(compact: compact),
+                    if (iconOnly)
+                      Tooltip(
+                        message: 'ثبت مصرف',
+                        child: IconButton.filled(
+                          onPressed: onNewExpense,
+                          icon: const Icon(Icons.add_rounded),
                         ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: colors.primary,
-                          foregroundColor: colors.onPrimary,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: compact ? 6 : 16,
+                      ),
+                    SizedBox(height: compact ? 10 : 18),
+                    if (!iconOnly)
+                      SizedBox(
+                        width: double.infinity,
+                        height: compact ? 48 : HesabTheme.sidebarActionHeight,
+                        child: FilledButton.icon(
+                          onPressed: onNewExpense,
+                          icon: Icon(
+                            Icons.add_rounded,
+                            size: compact ? 21 : 26,
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                          label: Text(
+                            'ثبت مصرف',
+                            style: TextStyle(
+                              fontSize: compact
+                                  ? HesabTheme.fontBody
+                                  : HesabTheme.fontControl,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: colors.primary,
+                            foregroundColor: colors.onPrimary,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: compact ? 6 : 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     SizedBox(height: compact ? 12 : 20),
                     for (var i = 0; i < items.length; i++) ...[
                       _NavigationButton(
                         item: items[i],
                         selected: i == selectedIndex,
                         compact: compact,
+                        iconOnly: iconOnly,
                         onTap: () => onSelect(i),
                       ),
                       if (i != items.length - 1)
@@ -405,18 +342,20 @@ class _NavigationButton extends StatelessWidget {
     required this.item,
     required this.selected,
     required this.compact,
+    required this.iconOnly,
     required this.onTap,
   });
 
   final _NavigationItem item;
   final bool selected;
   final bool compact;
+  final bool iconOnly;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Material(
+    final button = Material(
       color: selected
           ? HesabTheme.selectionSurface(context)
           : Colors.transparent,
@@ -432,6 +371,9 @@ class _NavigationButton extends StatelessWidget {
               end: compact ? 10 : 18,
             ),
             child: Row(
+              mainAxisAlignment: iconOnly
+                  ? MainAxisAlignment.center
+                  : MainAxisAlignment.start,
               children: [
                 SvgPicture.asset(
                   item.assetPath,
@@ -442,29 +384,33 @@ class _NavigationButton extends StatelessWidget {
                     BlendMode.srcIn,
                   ),
                 ),
-                SizedBox(width: compact ? 10 : 18),
-                Expanded(
-                  child: Text(
-                    item.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: compact
-                          ? HesabTheme.fontBody
-                          : HesabTheme.fontControl,
-                      color: selected
-                          ? Theme.of(context).colorScheme.primary
-                          : colors.onSurfaceVariant,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                if (!iconOnly) SizedBox(width: compact ? 10 : 18),
+                if (!iconOnly)
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: compact
+                            ? HesabTheme.fontBody
+                            : HesabTheme.fontControl,
+                        color: selected
+                            ? Theme.of(context).colorScheme.primary
+                            : colors.onSurfaceVariant,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
         ),
       ),
     );
+    return iconOnly ? Tooltip(message: item.label, child: button) : button;
   }
 }
 

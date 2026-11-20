@@ -44,7 +44,7 @@ void main() {
     expect(find.text('۳ صفحه، ۱۰۱ مورد'), findsOneWidget);
     expect(find.text('صفحه ۳: ۱۰۱–۱۰۱'), findsOneWidget);
 
-    await tester.tap(find.text('پاک‌کردن گزینش'));
+    await tester.tap(find.text('پاک‌کردن انتخاب'));
     await tester.pump();
     final confirmButton = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'خروجی گرفتن'),
@@ -53,7 +53,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('export-page-1')));
     await tester.pump();
-    expect(find.text('گزینش‌شده: ۱ صفحه، ۵۰ مورد'), findsOneWidget);
+    expect(find.text('انتخاب‌شده: ۱ صفحه، ۵۰ مورد'), findsOneWidget);
 
     await tester.tap(find.text('CSV (.csv)'));
     await tester.pump();

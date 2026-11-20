@@ -702,10 +702,10 @@ class _ExpensesTable extends StatelessWidget {
                             ][i],
                           ),
                         ),
-              SizedBox(
-                width: actionsWidth,
-                child: _HeaderCell('عملیات'),
-              ),
+                      SizedBox(
+                        width: actionsWidth,
+                        child: _HeaderCell('عملیات'),
+                      ),
                     ],
                   ),
                 ),
@@ -1054,7 +1054,12 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
   void initState() {
     super.initState();
     final expense = widget.initialExpense;
-    if (expense == null) return;
+    if (expense == null) {
+      if (_availableWallets.isNotEmpty) {
+        _walletIds.add(_availableWallets.first.id);
+      }
+      return;
+    }
 
     if (_availableWallets.any((wallet) => wallet.id == expense.walletId)) {
       _walletIds.add(expense.walletId);
@@ -1377,33 +1382,67 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
     ),
   );
 
-  Widget _walletSelector() => InputDecorator(
-    decoration: const InputDecoration(
-      labelText: 'کیف پول‌ها (به ترتیب برداشت)',
-      border: OutlineInputBorder(),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final wallet in _availableWallets)
-          CheckboxListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              '${wallet.name} — ${AmountCodec.formatMoneyMinor(wallet.balanceMinor)}',
-            ),
-            value: _walletIds.contains(wallet.id),
-            onChanged: (selected) => setState(() {
-              if (selected == true) {
-                _walletIds.add(wallet.id);
-              } else {
-                _walletIds.remove(wallet.id);
-              }
-            }),
+  Widget _walletSelector() {
+    final selected = _availableWallets
+        .where((wallet) => _walletIds.contains(wallet.id))
+        .toList();
+    final label = selected.isEmpty
+        ? 'کیف پول را انتخاب کنید'
+        : selected.length == 1
+        ? selected.first.name
+        : '${selected.first.name} و ${selected.length - 1} کیف پول دیگر';
+    return MenuAnchor(
+      menuChildren: [
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 12, 4),
+          child: Text(
+            'انتخاب کیف پول‌ها به ترتیب برداشت',
+            style: Theme.of(context).textTheme.labelMedium,
           ),
+        ),
+        SizedBox(
+          width: 280,
+          height: (_availableWallets.length * 56.0).clamp(56, 6 * 56),
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              for (final wallet in _availableWallets)
+                CheckboxListTile(
+                  dense: true,
+                  title: Text(wallet.name),
+                  subtitle: Text(
+                    AmountCodec.formatMoneyMinor(wallet.balanceMinor),
+                  ),
+                  value: _walletIds.contains(wallet.id),
+                  onChanged: (value) => setState(() {
+                    if (value == true) {
+                      _walletIds.add(wallet.id);
+                    } else {
+                      _walletIds.remove(wallet.id);
+                    }
+                  }),
+                ),
+            ],
+          ),
+        ),
       ],
-    ),
-  );
+      builder: (context, controller, child) => OutlinedButton(
+        onPressed: controller.isOpen ? controller.close : controller.open,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsetsDirectional.fromSTEB(12, 12, 12, 12),
+          alignment: AlignmentDirectional.centerStart,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _categoryDropdown({required bool enabled}) =>
       DropdownButtonFormField<int>(

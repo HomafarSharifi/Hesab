@@ -15,23 +15,23 @@ class HesabDatabase {
 
   Future<Database>? _opening;
 
+  Future<String> get path async {
+    final localAppData = Platform.environment['LOCALAPPDATA'];
+    if (localAppData == null || localAppData.isEmpty) {
+      throw StateError('Windows LOCALAPPDATA is not available.');
+    }
+    return '$localAppData${Platform.pathSeparator}Hesab${Platform.pathSeparator}hesab.sqlite3';
+  }
+
   Future<Database> get database => _opening ??= _open();
 
   Future<Database> _open() async {
     try {
       sqfliteFfiInit();
 
-      final localAppData = Platform.environment['LOCALAPPDATA'];
-      if (localAppData == null || localAppData.isEmpty) {
-        throw StateError('Windows LOCALAPPDATA is not available.');
-      }
-      final databaseDirectory = Directory(
-        '$localAppData${Platform.pathSeparator}Hesab',
-      );
+      final databasePath = await path;
+      final databaseDirectory = Directory(File(databasePath).parent.path);
       await databaseDirectory.create(recursive: true);
-
-      final databasePath =
-          '${databaseDirectory.path}${Platform.pathSeparator}hesab.sqlite3';
 
       return await databaseFactoryFfi.openDatabase(
         databasePath,
