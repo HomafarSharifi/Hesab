@@ -15,6 +15,7 @@ class DatabaseBootstrap extends StatefulWidget {
 
 class _DatabaseBootstrapState extends State<DatabaseBootstrap> {
   Future<Database>? _database;
+  int _databaseRevision = 0;
 
   @override
   void initState() {
@@ -23,7 +24,10 @@ class _DatabaseBootstrapState extends State<DatabaseBootstrap> {
   }
 
   void _onDatabaseChanged() {
-    setState(() => _database = HesabDatabase.instance.database);
+    setState(() {
+      _databaseRevision++;
+      _database = HesabDatabase.instance.database;
+    });
   }
 
   @override
@@ -38,6 +42,7 @@ class _DatabaseBootstrapState extends State<DatabaseBootstrap> {
           return const _DatabaseLoadingApp();
         }
         return HesabApp(
+          key: ValueKey(_databaseRevision),
           services: HesabServices(snapshot.data!),
           onDatabaseChanged: _onDatabaseChanged,
         );

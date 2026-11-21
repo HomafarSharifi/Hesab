@@ -4,7 +4,7 @@
 
 Hesab opens one SQLite database at startup and keeps the connection for the app session. On Windows, the file is stored at `%LOCALAPPDATA%/Hesab/hesab.sqlite3`, outside the repository and in local per-user app data. `sqflite_common_ffi` supplies the sqflite API backed by bundled SQLite for Windows desktop.
 
-The database is initialized by `HesabDatabase`. It enables and checks SQLite foreign-key enforcement on every opened connection. Version upgrades are append-only in `HesabMigrations`; the current schema version is 3. Never edit a migration that has shipped. Add a new numbered migration and raise `currentVersion` instead.
+The database is initialized by `HesabDatabase`. It enables and checks SQLite foreign-key enforcement on every opened connection. Version upgrades are append-only in `HesabMigrations`; the current schema version is 5. Never edit a migration that has shipped. Add a new numbered migration and raise `currentVersion` instead.
 
 ## Version 1 schema and later changes
 
@@ -15,6 +15,8 @@ The migration adapts the logical tables in `database schema.txt`:
 - `wallet_transaction` stores a constrained transaction type and optional `reversal_of_transaction_id`. A reversal must point to an unreversed deposit, purchase, or withdrawal in the same wallet for the same amount. Reversals are unique per original transaction.
 - `expense.transaction_id` is unique, and triggers reject expenses attached to non-purchase transactions. Transactions and expense rows are immutable after insertion; corrections are represented with reversal rows.
 - `wallet_balances` computes each balance in integer minor units, including the inverse effect of a reversal. New wallets therefore have a zero balance without an opening-balance field.
+- Version 4 adds optional wallet descriptions and an append-only `wallet_activity` audit table. Wallet creation, deposits, and metadata edits are logged transactionally; existing wallets and deposits are backfilled. Purchases, withdrawals, and reversals remain represented by the financial transaction ledger and are included in wallet history.
+- Version 5 corrects `wallet_balances` so a reversed purchase offsets its original allocation exactly once.
 - Foreign keys use `ON DELETE RESTRICT` so referenced categories, units, items, wallets, and transactions must be archived instead of removed.
 
 The application has one currency (AFN), so currency is not repeated in each row. Dates are stored as ISO `YYYY-MM-DD` Gregorian dates; the UI converts them to the Afghan Jalali calendar for display.

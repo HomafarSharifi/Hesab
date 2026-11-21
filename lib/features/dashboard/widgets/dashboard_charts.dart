@@ -832,8 +832,8 @@ class _ReferenceCategoryBreakdownCardState
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           color: colors.onSurface,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w600,
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                       const SizedBox(height: 3),
@@ -845,8 +845,8 @@ class _ReferenceCategoryBreakdownCardState
                                           ),
                                           style: TextStyle(
                                             color: colors.onSurface,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w800,
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                       ),
@@ -857,8 +857,8 @@ class _ReferenceCategoryBreakdownCardState
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             color: accentReadable,
-                                          fontSize: 7,
-                                            fontWeight: FontWeight.w700,
+                                          fontSize: 6,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                       ],

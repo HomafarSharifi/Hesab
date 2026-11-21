@@ -282,7 +282,7 @@ class CatalogRepository {
 
   Future<List<WalletRecord>> wallets({bool includeArchived = false}) async {
     final rows = await _database.rawQuery('''
-      SELECT w.wallet_id, w.wallet_name, w.archived_at, b.balance_minor,
+      SELECT w.wallet_id, w.wallet_name, w.archived_at, w.created_at, w.description, b.balance_minor,
         (SELECT COUNT(*) FROM purchase_wallet_allocation a
          WHERE a.wallet_id = w.wallet_id) AS purchase_count
       FROM wallet w
@@ -296,7 +296,7 @@ class CatalogRepository {
   Future<WalletRecord?> activeWallet(int id) async {
     final rows = await _database.rawQuery(
       '''
-      SELECT w.wallet_id, w.wallet_name, w.archived_at, b.balance_minor
+      SELECT w.wallet_id, w.wallet_name, w.archived_at, w.created_at, w.description, b.balance_minor
       FROM wallet w
       JOIN wallet_balances b ON b.wallet_id = w.wallet_id
       WHERE w.wallet_id = ? AND w.archived_at IS NULL
@@ -329,15 +329,19 @@ class CatalogRepository {
     await _database.delete('wallet', where: 'wallet_id = ?', whereArgs: [id]);
   }
 
-  Future<void> updateWallet(int id, String name, String normalizedName) async {
-    if (await _referenceCount('wallet_transaction', 'wallet_id', id) > 0) {
-      throw const AppFailure(
-        'این کیف پول سابقه تراکنش دارد و برای حفظ تاریخچه ویرایش نمی‌شود.',
-      );
-    }
+  Future<void> updateWallet(
+    int id,
+    String name,
+    String normalizedName, {
+    String? description,
+  }) async {
     await _database.update(
       'wallet',
-      {'wallet_name': name, 'normalized_name': normalizedName},
+      {
+        'wallet_name': name,
+        'normalized_name': normalizedName,
+        'description': description,
+      },
       where: 'wallet_id = ?',
       whereArgs: [id],
     );

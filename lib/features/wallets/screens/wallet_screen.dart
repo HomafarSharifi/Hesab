@@ -2,8 +2,10 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../app/hesab_services.dart';
 import '../../../core/finance/amount_codec.dart';
+import '../../../core/calendar/jalali_date.dart';
 import '../../../core/theme/hesab_theme.dart';
 import '../../../data/models/catalog_models.dart';
+import '../../shared/widgets/jalali_date_picker_dialog.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({required this.services, super.key});
@@ -14,55 +16,124 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen> {
   int _revision = 0;
+  WalletRecord? _selected;
+  bool _history = false;
 
-  Future<void> _newWallet() async {
-    final name = await showDialog<String>(
-      context: context,
-      builder: (_) => const _WalletNameDialog(),
-    );
-    if (name == null || name.trim().isEmpty) return;
-    try {
-      await widget.services.catalog.createWallet(name);
-      if (mounted) setState(() => _revision++);
-    } catch (error) {
-      _message(error);
-    }
+  void _refresh() {
+    if (mounted) setState(() => _revision++);
   }
 
-  Future<void> _transaction(WalletRecord wallet, String type) async {
-    final amount = await showDialog<String>(
+  void _message(Object error) => ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+  );
+
+  Future<void> _create() async {
+    final input = await showDialog<_WalletInput>(
       context: context,
-      builder: (_) => _WalletAmountDialog(walletName: wallet.name, type: type),
+      builder: (_) =>
+          const _WalletForm(title: 'کیف پول تازه', allowAmount: true),
     );
-    if (amount == null) return;
+    if (input == null) return;
     try {
-      final minor = AmountCodec.parseMoneyMinor(amount);
-      if (type == 'deposit') {
-        await widget.services.transactions.deposit(
-          walletId: wallet.id,
-          date: DateTime.now(),
-          amountMinor: minor,
-        );
-      } else {
-        await widget.services.transactions.withdrawal(
-          walletId: wallet.id,
-          date: DateTime.now(),
-          amountMinor: minor,
-        );
+      final amount = input.amount.trim().isEmpty
+          ? 0
+          : AmountCodec.parseMoneyMinor(input.amount);
+      await widget.services.transactions.createWalletWithInitialDeposit(
+        walletName: input.name,
+        amountMinor: amount,
+        description: input.description,
+      );
+      _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('کیف پول ثبت شد.')));
       }
-      if (mounted) setState(() => _revision++);
     } catch (error) {
       _message(error);
     }
   }
 
-  Future<void> _delete(WalletRecord wallet) async {
-    final confirmed = await showDialog<bool>(
+  Future<void> _addMoney(WalletRecord wallet) async {
+    final input = await showDialog<_WalletInput>(
+      context: context,
+      builder: (_) => const _WalletForm(
+        title: 'افزودن پول',
+        allowAmount: true,
+        amountRequired: true,
+      ),
+    );
+    if (input == null) return;
+    try {
+      final amount = AmountCodec.parseMoneyMinor(input.amount);
+      await widget.services.transactions.deposit(
+        walletId: wallet.id,
+        date: input.date,
+        amountMinor: amount,
+        note: input.description,
+      );
+      _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('پول به کیف اضافه شد.')));
+      }
+    } catch (error) {
+      _message(error);
+    }
+  }
+
+  Future<void> _withdraw(WalletRecord wallet) async {
+    final input = await showDialog<_WalletInput>(
+      context: context,
+      builder: (_) => const _WalletForm(
+        title: 'برداشت پول',
+        allowAmount: true,
+        amountRequired: true,
+      ),
+    );
+    if (input == null) return;
+    try {
+      await widget.services.transactions.withdrawal(
+        walletId: wallet.id,
+        date: input.date,
+        amountMinor: AmountCodec.parseMoneyMinor(input.amount),
+        note: input.description,
+      );
+      _refresh();
+    } catch (error) {
+      _message(error);
+    }
+  }
+
+  Future<void> _edit(WalletRecord wallet) async {
+    final input = await showDialog<_WalletInput>(
+      context: context,
+      builder: (_) => _WalletForm(
+        title: 'ویرایش کیف پول',
+        name: wallet.name,
+        description: wallet.description,
+      ),
+    );
+    if (input == null) return;
+    try {
+      await widget.services.transactions.updateWalletProfile(
+        walletId: wallet.id,
+        name: input.name,
+        description: input.description,
+      );
+      _refresh();
+    } catch (error) {
+      _message(error);
+    }
+  }
+
+  Future<void> _archive(WalletRecord wallet) async {
+    final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف کامل کیف پول'),
+        title: const Text('بایگانی کیف پول'),
         content: Text(
-          '«${wallet.name}» حذف شود؟ کیف پول دارای تراکنش قابل حذف نیست.',
+          '«${wallet.name}» بایگانی شود؟ سابقه و موجودی حفظ می‌شود.',
         ),
         actions: [
           TextButton(
@@ -71,24 +142,22 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('حذف'),
+            child: const Text('بایگانی'),
           ),
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (ok != true) return;
     try {
-      await widget.services.catalog.deleteWallet(wallet.id);
-      if (mounted) setState(() => _revision++);
+      await widget.services.catalog.archiveWallet(wallet.id);
+      setState(() {
+        _selected = null;
+        _history = false;
+        _revision++;
+      });
     } catch (error) {
       _message(error);
     }
-  }
-
-  void _message(Object error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
-    );
   }
 
   @override
@@ -97,119 +166,92 @@ class _WalletScreenState extends State<WalletScreen> {
     child: FutureBuilder<List<WalletRecord>>(
       key: ValueKey(_revision),
       future: widget.services.catalog.wallets(),
-      builder: (context, snapshot) => Padding(
-        padding: EdgeInsets.all(
-          MediaQuery.sizeOf(context).width < 600 ? 12 : 24,
-        ),
+      builder: (context, snapshot) {
+        final wallets = snapshot.data ?? const <WalletRecord>[];
+        final current = wallets.where((w) => w.id == _selected?.id).firstOrNull;
+        if (_selected != null && current != null) _selected = current;
+        if (_history && current != null) return _activityPage(current);
+        if (current != null) return _details(current);
+        return _walletList(snapshot, wallets);
+      },
+    ),
+  );
+
+  Widget _walletList(
+    AsyncSnapshot<List<WalletRecord>> snapshot,
+    List<WalletRecord> wallets,
+  ) => Padding(
+    padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 28),
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 840),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                const Spacer(),
+                const Expanded(
+                  child: Text(
+                    'کیف پول‌ها',
+                    style: TextStyle(
+                      fontSize: HesabTheme.fontPageTitle,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
                 FilledButton.icon(
-                  onPressed: _newWallet,
+                  onPressed: _create,
                   icon: const Icon(Icons.add),
                   label: const Text('کیف پول تازه'),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
             Expanded(
               child: snapshot.connectionState != ConnectionState.done
                   ? const Center(child: CircularProgressIndicator())
                   : snapshot.hasError
                   ? Center(child: Text('بارگذاری انجام نشد: ${snapshot.error}'))
-                  : snapshot.data!.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'کیف پولی ثبت نشده است. برای آغاز، کیف پول تازه بسازید.',
-                      ),
-                    )
+                  : wallets.isEmpty
+                  ? const Center(child: Text('کیف پولی ثبت نشده است.'))
                   : ListView.separated(
-                      itemCount: snapshot.data!.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemCount: wallets.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
                       itemBuilder: (context, index) {
-                        final wallet = snapshot.data![index];
-                        final narrow = MediaQuery.sizeOf(context).width < 560;
-                        final details = Row(
-                          children: [
-                            Icon(
-                              Icons.account_balance_wallet_outlined,
-                              color: Theme.of(context).colorScheme.primary,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    wallet.name,
-                                    style: const TextStyle(
-                                      fontSize: HesabTheme.fontSection,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'موجودی: ${AmountCodec.formatMoneyMinor(wallet.balanceMinor)}',
-                                    style: const TextStyle(
-                                      fontSize: HesabTheme.fontBody,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                        final actions = Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          alignment: WrapAlignment.end,
-                          children: [
-                            OutlinedButton(
-                              onPressed: () => _transaction(wallet, 'deposit'),
-                              child: const Text('واریز'),
-                            ),
-                            OutlinedButton(
-                              onPressed: () =>
-                                  _transaction(wallet, 'withdrawal'),
-                              child: const Text('برداشت'),
-                            ),
-                            IconButton(
-                              tooltip: 'حذف',
-                              onPressed: () => _delete(wallet),
-                              icon: const Icon(Icons.delete_outline),
-                            ),
-                          ],
-                        );
-                        return Card(
-                          child: Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(
-                              12,
-                              10,
-                              12,
-                              10,
-                            ),
-                            child: narrow
-                                ? Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      details,
-                                      const SizedBox(height: 8),
-                                      actions,
-                                    ],
-                                  )
-                                : Row(
-                                    children: [
-                                      Expanded(child: details),
-                                      const SizedBox(width: 8),
-                                      actions,
-                                    ],
-                                  ),
+                        final wallet = wallets[index];
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 7,
+                            horizontal: 8,
                           ),
+                          leading: Icon(
+                            Icons.account_balance_wallet_outlined,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          title: Text(
+                            wallet.name,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Text('ایجاد: ${_date(wallet.createdAt)}'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                AmountCodec.formatMoneyMinor(
+                                  wallet.balanceMinor,
+                                ),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              const Icon(Icons.chevron_left),
+                            ],
+                          ),
+                          onTap: () => setState(() {
+                            _selected = wallet;
+                            _history = false;
+                          }),
                         );
                       },
                     ),
@@ -219,88 +261,358 @@ class _WalletScreenState extends State<WalletScreen> {
       ),
     ),
   );
+
+  Widget _details(
+    WalletRecord wallet,
+  ) => FutureBuilder<List<Map<String, Object?>>>(
+    key: ValueKey('detail-${wallet.id}-$_revision'),
+    future: widget.services.transactions.walletActivities(wallet.id, limit: 3),
+    builder: (context, snapshot) => _contentFrame(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _backHeader(
+            'جزئیات کیف پول',
+            onBack: () => setState(() {
+              _selected = null;
+              _history = false;
+            }),
+            trailing: PopupMenuButton<String>(
+              onSelected: (v) {
+                if (v == 'edit') _edit(wallet);
+                if (v == 'archive') _archive(wallet);
+                if (v == 'withdraw') _withdraw(wallet);
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'edit', child: Text('ویرایش کیف پول')),
+                PopupMenuItem(value: 'withdraw', child: Text('برداشت پول')),
+                PopupMenuItem(value: 'archive', child: Text('بایگانی کیف پول')),
+              ],
+              icon: const Icon(Icons.more_vert),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            wallet.name,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'موجودی فعلی: ${AmountCodec.formatMoneyMinor(wallet.balanceMinor)}',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          Text(
+            'ایجاد: ${_date(wallet.createdAt)}',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FilledButton.icon(
+              onPressed: () => _addMoney(wallet),
+              icon: const Icon(Icons.add),
+              label: const Text('افزودن پول'),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'فعالیت‌های تازه',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+                ),
+              ),
+              TextButton(
+                onPressed: () => setState(() => _history = true),
+                child: const Text('نمایش همه'),
+              ),
+            ],
+          ),
+          if (snapshot.connectionState != ConnectionState.done)
+            const LinearProgressIndicator()
+          else if (snapshot.hasError)
+            Text('بارگذاری انجام نشد: ${snapshot.error}')
+          else if ((snapshot.data ?? []).isEmpty)
+            const Text('هنوز فعالیتی ثبت نشده است.')
+          else
+            ...(snapshot.data ?? []).map((a) => _activityTile(a)),
+        ],
+      ),
+    ),
+  );
+
+  Widget _activityPage(
+    WalletRecord wallet,
+  ) => FutureBuilder<List<Map<String, Object?>>>(
+    key: ValueKey('history-${wallet.id}-$_revision'),
+    future: widget.services.transactions.walletActivities(wallet.id),
+    builder: (context, snapshot) => _contentFrame(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _backHeader(
+            'سابقه فعالیت',
+            onBack: () => setState(() => _history = false),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            wallet.name,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: snapshot.connectionState != ConnectionState.done
+                ? const Center(child: CircularProgressIndicator())
+                : snapshot.hasError
+                ? Center(child: Text('بارگذاری انجام نشد: ${snapshot.error}'))
+                : (snapshot.data ?? []).isEmpty
+                ? const Center(child: Text('هنوز فعالیتی ثبت نشده است.'))
+                : ListView.separated(
+                    itemCount: snapshot.data!.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (_, i) => _activityTile(snapshot.data![i]),
+                  ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _activityTile(Map<String, Object?> a) {
+    final type = a['event_type'] as String? ?? '';
+    final label = switch (type) {
+      'created' => 'کیف پول ایجاد شد',
+      'deposit' =>
+        (a['details'] == 'موجودی آغازین'
+            ? 'پول آغازین افزوده شد'
+            : 'پول افزوده شد'),
+      'updated' => 'کیف پول ویرایش شد',
+      'purchase' => 'خرید',
+      'withdrawal' => 'برداشت پول',
+      'reversal' => 'برگشت تراکنش',
+      _ => 'فعالیت',
+    };
+    final amount = a['amount_minor'] as int?;
+    final date =
+        a['transaction_date'] as String? ?? a['occurred_at'] as String?;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      leading: Icon(
+        type == 'deposit'
+            ? Icons.south_west
+            : type == 'created'
+            ? Icons.add_circle_outline
+            : Icons.edit_outlined,
+      ),
+      title: Text(label),
+      subtitle: Text(
+        '${_date(date)}${(a['details'] as String?)?.isNotEmpty == true ? ' · ${a['details']}' : ''}',
+      ),
+      trailing: amount == null
+          ? null
+          : Text(
+              '${type == 'deposit'
+                  ? '+'
+                  : type == 'purchase' || type == 'withdrawal'
+                  ? '−'
+                  : ''}${AmountCodec.formatMoneyMinor(amount)}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+      onTap: () => showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(label),
+          content: Text(
+            [
+              'تاریخ: ${_date(date)}',
+              if (amount != null)
+                'مبلغ: ${type == 'deposit'
+                    ? '+'
+                    : type == 'purchase' || type == 'withdrawal'
+                    ? '−'
+                    : ''}${AmountCodec.formatMoneyMinor(amount)}',
+              if ((a['note'] as String?)?.isNotEmpty == true)
+                'توضیحات: ${a['note']}',
+              if ((a['details'] as String?)?.isNotEmpty == true)
+                'جزئیات: ${a['details']}',
+            ].join('\n'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('بستن'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _contentFrame(Widget child) => Padding(
+    padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 28),
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 840),
+        child: child,
+      ),
+    ),
+  );
+  Widget _backHeader(
+    String title, {
+    required VoidCallback onBack,
+    Widget? trailing,
+  }) => Row(
+    children: [
+      IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_forward)),
+      Expanded(
+        child: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 19),
+        ),
+      ),
+      ?trailing,
+    ],
+  );
+  String _date(String? value) {
+    if (value == null || value.isEmpty) return '—';
+    final d = DateTime.tryParse(value);
+    return d == null ? value : JalaliDate.fromGregorian(d).fullDate;
+  }
 }
 
-class _WalletNameDialog extends StatefulWidget {
-  const _WalletNameDialog();
+class _WalletInput {
+  const _WalletInput(this.name, this.amount, this.description, this.date);
+  final String name, amount;
+  final String? description;
+  final DateTime date;
+}
+
+class _WalletForm extends StatefulWidget {
+  const _WalletForm({
+    required this.title,
+    this.name = '',
+    this.description,
+    this.allowAmount = false,
+    this.amountRequired = false,
+  });
+  final String title, name;
+  final String? description;
+  final bool allowAmount, amountRequired;
   @override
-  State<_WalletNameDialog> createState() => _WalletNameDialogState();
+  State<_WalletForm> createState() => _WalletFormState();
 }
 
-class _WalletNameDialogState extends State<_WalletNameDialog> {
-  final _name = TextEditingController();
+class _WalletFormState extends State<_WalletForm> {
+  late final _name = TextEditingController(text: widget.name);
+  late final _amount = TextEditingController();
+  late final _description = TextEditingController(text: widget.description);
+  DateTime _date = DateTime.now();
+  bool _saving = false;
   @override
   void dispose() {
     _name.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('کیف پول تازه'),
-    content: TextField(
-      controller: _name,
-      autofocus: true,
-      decoration: const InputDecoration(
-        labelText: 'نام',
-        border: OutlineInputBorder(),
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('لغو'),
-      ),
-      FilledButton(
-        onPressed: () => Navigator.pop(context, _name.text),
-        child: const Text('ثبت'),
-      ),
-    ],
-  );
-}
-
-class _WalletAmountDialog extends StatefulWidget {
-  const _WalletAmountDialog({required this.walletName, required this.type});
-  final String walletName;
-  final String type;
-  @override
-  State<_WalletAmountDialog> createState() => _WalletAmountDialogState();
-}
-
-class _WalletAmountDialogState extends State<_WalletAmountDialog> {
-  final _amount = TextEditingController();
-  @override
-  void dispose() {
     _amount.dispose();
+    _description.dispose();
     super.dispose();
+  }
+
+  Future<void> _chooseDate() async {
+    final value = await showJalaliDatePicker(context, initialDate: _date);
+    if (value != null && mounted) setState(() => _date = value);
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(
-      widget.type == 'deposit'
-          ? 'واریز به ${widget.walletName}'
-          : 'برداشت از ${widget.walletName}',
-    ),
-    content: TextField(
-      controller: _amount,
-      autofocus: true,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: const InputDecoration(
-        labelText: 'مبلغ',
-        suffixText: '؋',
-        border: OutlineInputBorder(),
+    title: Text(widget.title),
+    content: SizedBox(
+      width: 390,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!widget.amountRequired)
+              TextField(
+                controller: _name,
+                autofocus: true,
+                maxLength: 45,
+                decoration: const InputDecoration(
+                  labelText: 'نام کیف پول',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            if (widget.allowAmount) ...[
+              if (!widget.amountRequired) const SizedBox(height: 10),
+              TextField(
+                controller: _amount,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: widget.amountRequired
+                      ? 'مبلغ *'
+                      : 'موجودی آغازین (اختیاری)',
+                  suffixText: '؋',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (widget.amountRequired)
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: OutlinedButton.icon(
+                  onPressed: _chooseDate,
+                  icon: const Icon(Icons.calendar_today_outlined),
+                  label: Text('تاریخ: ${_dateLabel(_date)}'),
+                ),
+              ),
+            if (!widget.amountRequired) const SizedBox(height: 10),
+            TextField(
+              controller: _description,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'توضیحات (اختیاری)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
     actions: [
       TextButton(
-        onPressed: () => Navigator.pop(context),
+        onPressed: _saving ? null : () => Navigator.pop(context),
         child: const Text('لغو'),
       ),
       FilledButton(
-        onPressed: () => Navigator.pop(context, _amount.text),
+        onPressed: _saving
+            ? null
+            : () {
+                if (widget.amountRequired && _amount.text.trim().isEmpty) {
+                  return;
+                }
+                if (!widget.amountRequired && _name.text.trim().isEmpty) {
+                  return;
+                }
+                setState(() => _saving = true);
+                Navigator.pop(
+                  context,
+                  _WalletInput(
+                    _name.text.trim(),
+                    _amount.text.trim(),
+                    _description.text.trim().isEmpty
+                        ? null
+                        : _description.text.trim(),
+                    _date,
+                  ),
+                );
+              },
         child: const Text('ثبت'),
       ),
     ],
   );
+  String _dateLabel(DateTime d) => '${d.year}/${d.month}/${d.day}';
 }

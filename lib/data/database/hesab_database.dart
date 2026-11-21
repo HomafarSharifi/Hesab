@@ -9,13 +9,20 @@ import 'migrations/hesab_migrations.dart';
 /// Repositories should receive [database] through their constructors. UI
 /// widgets must not import this class or issue SQL queries directly.
 class HesabDatabase {
-  HesabDatabase._();
+  HesabDatabase._([this._pathOverride]);
+
+  /// Creates an isolated database owner at [path], primarily for maintenance
+  /// workflows that need to operate on temporary database files.
+  factory HesabDatabase.atPath(String path) => HesabDatabase._(path);
 
   static final HesabDatabase instance = HesabDatabase._();
+
+  final String? _pathOverride;
 
   Future<Database>? _opening;
 
   Future<String> get path async {
+    if (_pathOverride != null) return _pathOverride;
     final localAppData = Platform.environment['LOCALAPPDATA'];
     if (localAppData == null || localAppData.isEmpty) {
       throw StateError('Windows LOCALAPPDATA is not available.');

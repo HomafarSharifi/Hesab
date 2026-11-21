@@ -63,6 +63,8 @@ class WalletRecord {
     required this.balanceMinor,
     this.purchaseCount = 0,
     this.archivedAt,
+    this.createdAt,
+    this.description,
   });
 
   final int id;
@@ -70,6 +72,8 @@ class WalletRecord {
   final int balanceMinor;
   final int purchaseCount;
   final String? archivedAt;
+  final String? createdAt;
+  final String? description;
 
   factory WalletRecord.fromMap(Map<String, Object?> map) => WalletRecord(
     id: map['wallet_id']! as int,
@@ -77,5 +81,7 @@ class WalletRecord {
     balanceMinor: map['balance_minor']! as int,
     purchaseCount: map['purchase_count'] as int? ?? 0,
     archivedAt: map['archived_at'] as String?,
+    createdAt: map['created_at'] as String?,
+    description: map['description'] as String?,
   );
 }

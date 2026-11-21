@@ -655,154 +655,193 @@ class _ExpensesTable extends StatelessWidget {
         const outerHorizontalPadding = 12.0;
         const indexWidth = 28.0;
         const actionsWidth = 108.0;
-        const ruleFlexes = <double>[12, 18, 12, 12, 11, 11, 11];
+        const columnFlexes = <double>[12, 18, 12, 11, 11, 11];
         final contentWidth = constraints.maxWidth - outerHorizontalPadding * 2;
         final flexibleWidth = contentWidth - indexWidth - actionsWidth;
-        final totalFlex = ruleFlexes.fold<double>(0, (sum, flex) => sum + flex);
-        final ruleWidths = ruleFlexes
+        final totalFlex = columnFlexes.fold<double>(
+          0,
+          (sum, flex) => sum + flex,
+        );
+        final columnWidths = columnFlexes
             .map((flex) => flexibleWidth * flex / totalFlex)
             .toList();
-        final rulePositions = <double>[];
+        final rulePositions = <double>[
+          constraints.maxWidth - outerHorizontalPadding - indexWidth,
+        ];
         var currentRight =
             constraints.maxWidth - outerHorizontalPadding - indexWidth;
 
-        for (final width in ruleWidths) {
-          rulePositions.add(currentRight);
+        for (final width in columnWidths) {
           currentRight -= width;
+          rulePositions.add(currentRight);
         }
         return Stack(
           children: [
             Column(
-      children: [
-        Container(
-          color: HesabTheme.selectionSurface(context),
-          padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 12, 6),
-          child: Row(
-            children: [
-              SizedBox(width: 28, child: _HeaderCell('#')),
-              Expanded(flex: 12, child: _HeaderCell('تاریخ')),
-              Expanded(flex: 18, child: _HeaderCell('جنس')),
-              Expanded(flex: 12, child: _HeaderCell('دسته‌بندی')),
-              Expanded(flex: 11, child: _HeaderCell('کیف پول')),
-              Expanded(flex: 11, child: _HeaderCell('مقدار')),
-              Expanded(flex: 11, child: _HeaderCell('مجموع')),
-              SizedBox(width: 108, child: Text('عملیات')),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView.separated(
-            itemCount: expenses.length,
-            separatorBuilder: (context, index) =>
-                Divider(height: 1, color: Theme.of(context).dividerColor),
-            itemBuilder: (context, index) {
-              final expense = expenses[index];
-              return ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 40),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(12, 2, 12, 2),
+              children: [
+                Container(
+                  color: HesabTheme.selectionSurface(context),
+                  padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 12, 6),
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      SizedBox(
-                        width: 28,
-                        child: _PaddedCell(
-                          child: _CellText(
-                          _dariDigits(pageIndex * pageSize + index + 1),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 12,
-                        child: _PaddedCell(child: _CellText(dateLabel(expense.date))),
-                      ),
-                      Expanded(
-                        flex: 18,
-                        child: _PaddedCell(child: _CellText(expense.itemName, strong: true)),
-                      ),
-                      Expanded(
-                        flex: 12,
-                        child: _PaddedCell(child: _CellText(expense.categoryName)),
-                      ),
-                      Expanded(flex: 11, child: _PaddedCell(child: _CellText(expense.walletName))),
-                      Expanded(
-                        flex: 11,
-                        child: _PaddedCell(child: _CellText(
-                          '${AmountCodec.formatQuantityCenti(expense.quantityCenti)} ${expense.unitName}',
-                        )),
-                      ),
-                      Expanded(
-                        flex: 11,
-                        child: _PaddedCell(child: _CellText(
-                          AmountCodec.formatMoneyMinor(expense.amountMinor),
-                          strong: true,
-                        )),
-                      ),
-                      SizedBox(
-                        width: 108,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (!expense.isReversed)
-                              IconButton(
-                                tooltip: 'ویرایش خرید',
-                                visualDensity: VisualDensity.compact,
-                                iconSize: 17,
-                                constraints: const BoxConstraints.tightFor(
-                                  width: 36,
-                                  height: 36,
-                                ),
-                                onPressed: () => onEdit(expense),
-                                icon: const Icon(Icons.edit_outlined),
-                              ),
-                            IconButton(
-                              tooltip: 'جزئیات',
-                              visualDensity: VisualDensity.compact,
-                              iconSize: 17,
-                              constraints: const BoxConstraints.tightFor(
-                                width: 36,
-                                height: 36,
-                              ),
-                              onPressed: () => onDetails(expense),
-                              icon: const Icon(Icons.info_outline_rounded),
-                            ),
-                            if (expense.isReversed)
-                              Icon(
-                                Icons.check_circle_outline_rounded,
-                                size: 17,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              )
-                            else
-                              IconButton(
-                                tooltip: 'برگشت خرید',
-                                visualDensity: VisualDensity.compact,
-                                iconSize: 17,
-                                constraints: const BoxConstraints.tightFor(
-                                  width: 36,
-                                  height: 36,
-                                ),
-                                onPressed: () => onReverse(expense),
-                                icon: const Icon(Icons.undo_rounded),
-                              ),
-                          ],
-                        ),
-                      ),
+                      SizedBox(width: 28, child: _HeaderCell('#')),
+                      Expanded(flex: 12, child: _HeaderCell('تاریخ')),
+                      Expanded(flex: 18, child: _HeaderCell('جنس')),
+                      Expanded(flex: 12, child: _HeaderCell('دسته‌بندی')),
+                      Expanded(flex: 11, child: _HeaderCell('کیف پول')),
+                      Expanded(flex: 11, child: _HeaderCell('مقدار')),
+                      Expanded(flex: 11, child: _HeaderCell('مجموع')),
+                      SizedBox(width: 108, child: Text('عملیات')),
                     ],
                   ),
                 ),
-              );
-            },
-          ),
-        ),
-        _ExpensePaginationBar(
-          pageIndex: pageIndex,
-          pageCount: pageCount,
-          onPreviousPage: onPreviousPage,
-          onNextPage: onNextPage,
-        ),
-      ],
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: expenses.length,
+                    separatorBuilder: (context, index) => Divider(
+                      height: 1,
+                      color: Theme.of(context).dividerColor,
+                    ),
+                    itemBuilder: (context, index) {
+                      final expense = expenses[index];
+                      return ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 40),
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.fromSTEB(
+                            12,
+                            2,
+                            12,
+                            2,
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 28,
+                                child: _PaddedCell(
+                                  child: _CellText(
+                                    _dariDigits(
+                                      pageIndex * pageSize + index + 1,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 12,
+                                child: _PaddedCell(
+                                  child: _CellText(dateLabel(expense.date)),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 18,
+                                child: _PaddedCell(
+                                  child: _CellText(
+                                    expense.itemName,
+                                    strong: true,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 12,
+                                child: _PaddedCell(
+                                  child: _CellText(expense.categoryName),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 11,
+                                child: _PaddedCell(
+                                  child: _CellText(expense.walletName),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 11,
+                                child: _PaddedCell(
+                                  child: _CellText(
+                                    '${AmountCodec.formatQuantityCenti(expense.quantityCenti)} ${expense.unitName}',
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 11,
+                                child: _PaddedCell(
+                                  child: _CellText(
+                                    AmountCodec.formatMoneyMinor(
+                                      expense.amountMinor,
+                                    ),
+                                    strong: true,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: 108,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (!expense.isReversed)
+                                      IconButton(
+                                        tooltip: 'ویرایش خرید',
+                                        visualDensity: VisualDensity.compact,
+                                        iconSize: 17,
+                                        constraints:
+                                            const BoxConstraints.tightFor(
+                                              width: 36,
+                                              height: 36,
+                                            ),
+                                        onPressed: () => onEdit(expense),
+                                        icon: const Icon(Icons.edit_outlined),
+                                      ),
+                                    IconButton(
+                                      tooltip: 'جزئیات',
+                                      visualDensity: VisualDensity.compact,
+                                      iconSize: 17,
+                                      constraints:
+                                          const BoxConstraints.tightFor(
+                                            width: 36,
+                                            height: 36,
+                                          ),
+                                      onPressed: () => onDetails(expense),
+                                      icon: const Icon(
+                                        Icons.info_outline_rounded,
+                                      ),
+                                    ),
+                                    if (expense.isReversed)
+                                      Icon(
+                                        Icons.check_circle_outline_rounded,
+                                        size: 17,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      )
+                                    else
+                                      IconButton(
+                                        tooltip: 'برگشت خرید',
+                                        visualDensity: VisualDensity.compact,
+                                        iconSize: 17,
+                                        constraints:
+                                            const BoxConstraints.tightFor(
+                                              width: 36,
+                                              height: 36,
+                                            ),
+                                        onPressed: () => onReverse(expense),
+                                        icon: const Icon(Icons.undo_rounded),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                _ExpensePaginationBar(
+                  pageIndex: pageIndex,
+                  pageCount: pageCount,
+                  onPreviousPage: onPreviousPage,
+                  onNextPage: onNextPage,
+                ),
+              ],
             ),
             Positioned.fill(
               child: IgnorePointer(
@@ -822,7 +861,10 @@ class _ExpensesTable extends StatelessWidget {
 }
 
 class _ExpenseTableRulesPainter extends CustomPainter {
-  const _ExpenseTableRulesPainter({required this.positions, required this.color});
+  const _ExpenseTableRulesPainter({
+    required this.positions,
+    required this.color,
+  });
   final List<double> positions;
   final Color color;
 

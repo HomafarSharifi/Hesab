@@ -3,7 +3,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 /// Schema changes are append-only. Increment [currentVersion] and add a
 /// migration case whenever the persisted schema changes.
 abstract final class HesabMigrations {
-  static const currentVersion = 3;
+  static const currentVersion = 5;
 
   static Future<void> onCreate(Database database, int version) =>
       migrate(database, fromVersion: 0, toVersion: version);
@@ -34,10 +34,90 @@ abstract final class HesabMigrations {
         case 3:
           await _migrateVersion3(database);
           break;
+        case 4:
+          await _migrateVersion4(database);
+          break;
+        case 5:
+          await _migrateVersion5(database);
+          break;
         default:
           throw StateError('No Hesab database migration exists for v$version.');
       }
     }
+  }
+
+  static Future<void> _migrateVersion4(DatabaseExecutor database) async {
+    await database.execute('ALTER TABLE wallet ADD COLUMN description TEXT');
+    await database.execute('''
+      CREATE TABLE wallet_activity (
+        activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        wallet_id INTEGER NOT NULL,
+        event_type TEXT NOT NULL CHECK(event_type IN ('created','deposit','updated')),
+        occurred_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        transaction_id INTEGER,
+        details TEXT,
+        FOREIGN KEY(wallet_id) REFERENCES wallet(wallet_id) ON DELETE RESTRICT,
+        FOREIGN KEY(transaction_id) REFERENCES wallet_transaction(transaction_id) ON DELETE RESTRICT
+      )
+    ''');
+    await database.execute(
+      'CREATE INDEX wallet_activity_recent_idx ON wallet_activity(wallet_id, occurred_at DESC, activity_id DESC)',
+    );
+    await database.execute('''
+      CREATE TRIGGER wallet_activity_immutable_update
+      BEFORE UPDATE ON wallet_activity
+      BEGIN
+        SELECT RAISE(ABORT, 'wallet_activity_is_immutable');
+      END
+    ''');
+    await database.execute('''
+      CREATE TRIGGER wallet_activity_immutable_delete
+      BEFORE DELETE ON wallet_activity
+      BEGIN
+        SELECT RAISE(ABORT, 'wallet_activity_is_immutable');
+      END
+    ''');
+    await database.execute('''
+      INSERT INTO wallet_activity(wallet_id, event_type, occurred_at, transaction_id, details)
+      SELECT wallet_id, 'created', created_at, NULL, NULL FROM wallet
+    ''');
+    await database.execute('''
+      INSERT INTO wallet_activity(wallet_id, event_type, occurred_at, transaction_id, details)
+      SELECT wallet_id, 'deposit', created_at, transaction_id, note
+      FROM wallet_transaction WHERE transaction_type = 'deposit'
+    ''');
+  }
+
+  static Future<void> _migrateVersion5(DatabaseExecutor database) async {
+    await database.execute('DROP VIEW wallet_balances');
+    await database.execute('''
+      CREATE VIEW wallet_balances AS
+      SELECT wallet.wallet_id,
+        COALESCE((
+          SELECT SUM(CASE
+            WHEN t.transaction_type IN ('deposit', 'withdrawal') THEN
+              CASE WHEN t.transaction_type = 'deposit' THEN t.amount_minor ELSE -t.amount_minor END
+            WHEN t.transaction_type = 'reversal' AND original.transaction_type <> 'purchase' THEN
+              CASE WHEN original.transaction_type = 'deposit' THEN -t.amount_minor ELSE t.amount_minor END
+            ELSE 0 END)
+          FROM wallet_transaction t
+          LEFT JOIN wallet_transaction original ON original.transaction_id = t.reversal_of_transaction_id
+          WHERE t.wallet_id = wallet.wallet_id
+        ), 0)
+        + COALESCE((
+          SELECT SUM(-allocation.amount_minor)
+          FROM purchase_wallet_allocation allocation
+          WHERE allocation.wallet_id = wallet.wallet_id
+        ), 0)
+        + COALESCE((
+          SELECT SUM(allocation.amount_minor)
+          FROM purchase_wallet_allocation allocation
+          JOIN wallet_transaction reversal
+            ON reversal.reversal_of_transaction_id = allocation.transaction_id
+          WHERE allocation.wallet_id = wallet.wallet_id
+        ), 0) AS balance_minor
+      FROM wallet
+    ''');
   }
 
   static Future<void> _createVersion1(DatabaseExecutor database) async {

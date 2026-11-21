@@ -107,6 +107,7 @@ class DatabaseMaintenanceService {
         'unit',
         'item',
         'wallet',
+        'wallet_activity',
         'wallet_transaction',
         'expense',
       };
