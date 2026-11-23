@@ -9,6 +9,59 @@ import '../../../data/models/catalog_models.dart';
 import '../../shared/widgets/app_empty_state.dart';
 import '../../shared/widgets/jalali_date_picker_dialog.dart';
 
+class WalletActivityPresentation {
+  const WalletActivityPresentation._();
+
+  static String label(Map<String, Object?> activity) {
+    final type = activity['event_type'] as String? ?? '';
+    final originalType = activity['original_type'] as String?;
+    return switch (type) {
+      'created' => 'کیف پول ایجاد شد',
+      'deposit' =>
+        activity['details'] == 'موجودی'
+            ? 'پول آغازین افزوده شد'
+            : 'پول افزوده شد',
+      'updated' => 'کیف پول ویرایش شد',
+      'purchase' => activity['is_reversed'] == 1 ? 'خرید (برگشت‌شده)' : 'خرید',
+      'withdrawal' => 'برداشت پول',
+      'reversal' => switch (originalType) {
+        'deposit' => 'برگشت پول افزوده‌شده',
+        'withdrawal' => 'برگشت برداشت',
+        'purchase' => 'برگشت خرید',
+        _ => 'برگشت تراکنش',
+      },
+      _ => 'فعالیت',
+    };
+  }
+
+  static String? amountLabel(Map<String, Object?> activity) {
+    final amount = activity['amount_minor'] as int?;
+    if (amount == null) return null;
+    final type = activity['event_type'] as String? ?? '';
+    final originalType = activity['original_type'] as String?;
+    final prefix = switch (type) {
+      'deposit' => '+',
+      'withdrawal' || 'purchase' => '−',
+      'reversal' when originalType == 'deposit' => '−',
+      'reversal'
+          when originalType == 'withdrawal' || originalType == 'purchase' =>
+        '+',
+      _ => '',
+    };
+    return '$prefix${AmountCodec.formatMoneyMinor(amount)}';
+  }
+
+  static IconData icon(Map<String, Object?> activity) =>
+      switch (activity['event_type']) {
+        'created' => Icons.add_circle_outline,
+        'deposit' => Icons.south_west,
+        'withdrawal' => Icons.north_east,
+        'purchase' => Icons.shopping_cart_outlined,
+        'reversal' => Icons.undo_rounded,
+        _ => Icons.edit_outlined,
+      };
+}
+
 class WalletScreen extends StatefulWidget {
   const WalletScreen({required this.services, super.key});
   final HesabServices services;
@@ -184,7 +237,8 @@ class _WalletScreenState extends State<WalletScreen> {
     List<WalletRecord> wallets,
   ) => Padding(
     padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 28),
-    child: snapshot.connectionState == ConnectionState.done &&
+    child:
+        snapshot.connectionState == ConnectionState.done &&
             !snapshot.hasError &&
             wallets.isEmpty
         ? AppEmptyState(
@@ -194,81 +248,90 @@ class _WalletScreenState extends State<WalletScreen> {
             onAction: _create,
           )
         : Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 840),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'کیف پول‌ها',
-                    style: TextStyle(
-                      fontSize: HesabTheme.fontPageTitle,
-                      fontWeight: FontWeight.w700,
-                    ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 840),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'کیف پول‌ها',
+                          style: TextStyle(
+                            fontSize: HesabTheme.fontPageTitle,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      FilledButton.icon(
+                        onPressed: _create,
+                        icon: const Icon(Icons.add),
+                        label: const Text('کیف پول تازه'),
+                      ),
+                    ],
                   ),
-                ),
-                FilledButton.icon(
-                  onPressed: _create,
-                  icon: const Icon(Icons.add),
-                  label: const Text('کیف پول تازه'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Expanded(
-              child: snapshot.connectionState != ConnectionState.done
-                  ? const Center(child: CircularProgressIndicator())
-                  : snapshot.hasError
-                  ? Center(child: Text('بارگذاری انجام نشد: ${snapshot.error}'))
-                  : ListView.separated(
-                      itemCount: wallets.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final wallet = wallets[index];
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 7,
-                            horizontal: 8,
-                          ),
-                          leading: Icon(
-                            Icons.account_balance_wallet_outlined,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          title: Text(
-                            wallet.name,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text('ایجاد: ${_date(wallet.createdAt)}'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                AmountCodec.formatMoneyMinor(
-                                  wallet.balanceMinor,
+                  const SizedBox(height: 18),
+                  Expanded(
+                    child: snapshot.connectionState != ConnectionState.done
+                        ? const Center(child: CircularProgressIndicator())
+                        : snapshot.hasError
+                        ? Center(
+                            child: Text(
+                              'بارگذاری انجام نشد: ${snapshot.error}',
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: wallets.length,
+                            separatorBuilder: (_, _) =>
+                                const Divider(height: 1),
+                            itemBuilder: (context, index) {
+                              final wallet = wallets[index];
+                              return ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 7,
+                                  horizontal: 8,
                                 ),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
+                                leading: Icon(
+                                  Icons.account_balance_wallet_outlined,
+                                  color: Theme.of(context).colorScheme.primary,
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              const Icon(Icons.chevron_right),
-                            ],
+                                title: Text(
+                                  wallet.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  'ایجاد: ${_date(wallet.createdAt)}',
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      AmountCodec.formatMoneyMinor(
+                                        wallet.balanceMinor,
+                                      ),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Icon(Icons.chevron_right),
+                                  ],
+                                ),
+                                onTap: () => setState(() {
+                                  _selected = wallet;
+                                  _history = false;
+                                }),
+                              );
+                            },
                           ),
-                          onTap: () => setState(() {
-                            _selected = wallet;
-                            _history = false;
-                          }),
-                        );
-                      },
-                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
-    ),
+          ),
   );
 
   Widget _details(
@@ -391,43 +454,24 @@ class _WalletScreenState extends State<WalletScreen> {
   );
 
   Widget _activityTile(Map<String, Object?> a) {
-    final type = a['event_type'] as String? ?? '';
-    final label = switch (type) {
-      'created' => 'کیف پول ایجاد شد',
-      'deposit' =>
-        (a['details'] == 'موجودی'
-            ? 'پول آغازین افزوده شد'
-            : 'پول افزوده شد'),
-      'updated' => 'کیف پول ویرایش شد',
-      'purchase' => 'خرید',
-      'withdrawal' => 'برداشت پول',
-      'reversal' => 'برگشت تراکنش',
-      _ => 'فعالیت',
-    };
-    final amount = a['amount_minor'] as int?;
+    final label = WalletActivityPresentation.label(a);
+    final amountLabel = WalletActivityPresentation.amountLabel(a);
+    final itemName = a['item_name'] as String?;
+    final details = [
+      if (itemName != null && itemName.isNotEmpty) itemName,
+      if ((a['details'] as String?)?.isNotEmpty == true) a['details'] as String,
+    ].join(' · ');
     final date =
         a['transaction_date'] as String? ?? a['occurred_at'] as String?;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-      leading: Icon(
-        type == 'deposit'
-            ? Icons.south_west
-            : type == 'created'
-            ? Icons.add_circle_outline
-            : Icons.edit_outlined,
-      ),
+      leading: Icon(WalletActivityPresentation.icon(a)),
       title: Text(label),
-      subtitle: Text(
-        '${_date(date)}${(a['details'] as String?)?.isNotEmpty == true ? ' · ${a['details']}' : ''}',
-      ),
-      trailing: amount == null
+      subtitle: Text('${_date(date)}${details.isEmpty ? '' : ' · $details'}'),
+      trailing: amountLabel == null
           ? null
           : Text(
-              '${type == 'deposit'
-                  ? '+'
-                  : type == 'purchase' || type == 'withdrawal'
-                  ? '−'
-                  : ''}${AmountCodec.formatMoneyMinor(amount)}',
+              amountLabel,
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
       onTap: () => showDialog<void>(
@@ -437,12 +481,8 @@ class _WalletScreenState extends State<WalletScreen> {
           content: Text(
             [
               'تاریخ: ${_date(date)}',
-              if (amount != null)
-                'مبلغ: ${type == 'deposit'
-                    ? '+'
-                    : type == 'purchase' || type == 'withdrawal'
-                    ? '−'
-                    : ''}${AmountCodec.formatMoneyMinor(amount)}',
+              if (amountLabel != null) 'مبلغ: $amountLabel',
+              if (itemName != null && itemName.isNotEmpty) 'جنس: $itemName',
               if ((a['note'] as String?)?.isNotEmpty == true)
                 'توضیحات: ${a['note']}',
               if ((a['details'] as String?)?.isNotEmpty == true)

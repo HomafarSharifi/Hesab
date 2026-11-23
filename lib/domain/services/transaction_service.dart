@@ -28,17 +28,17 @@ class TransactionService {
         throw const AppFailure('این کیف پول پیش از این ثبت شده است.');
       }
       final walletId = await catalog.createWallet(name, normalizedName);
-      await transaction.update(
-        'wallet',
-        {'description': _cleanNote(description)},
-        where: 'wallet_id = ?',
-        whereArgs: [walletId],
+      await catalog.updateWallet(
+        walletId,
+        name,
+        normalizedName,
+        description: _cleanNote(description),
       );
-      await transaction.insert('wallet_activity', {
-        'wallet_id': walletId,
-        'event_type': 'created',
-        'details': description,
-      });
+      await catalog.insertWalletActivity(
+        walletId: walletId,
+        eventType: 'created',
+        details: description,
+      );
       if (amountMinor > 0) {
         final transactionId = await FinancialRepository(transaction)
             .insertTransaction(
@@ -48,12 +48,12 @@ class TransactionService {
               amountMinor: amountMinor,
               note: 'موجودی',
             );
-        await transaction.insert('wallet_activity', {
-          'wallet_id': walletId,
-          'event_type': 'deposit',
-          'transaction_id': transactionId,
-          'details': 'موجودی',
-        });
+        await catalog.insertWalletActivity(
+          walletId: walletId,
+          eventType: 'deposit',
+          transactionId: transactionId,
+          details: 'موجودی',
+        );
       }
     });
   }
@@ -65,38 +65,25 @@ class TransactionService {
   }) async {
     final cleanName = _validateName(name, 45, 'نام کیف پول');
     await _database.transaction((transaction) async {
-      final rows = await transaction.query(
-        'wallet',
-        where: 'wallet_id = ? AND archived_at IS NULL',
-        whereArgs: [walletId],
-        limit: 1,
-      );
-      if (rows.isEmpty) throw const AppFailure('کیف پول انتخاب‌شده فعال نیست.');
-      final old = rows.single;
-      final oldName = old['wallet_name']! as String;
-      final oldDescription = old['description'] as String?;
+      final catalog = CatalogRepository(transaction);
+      final old = await catalog.activeWallet(walletId);
+      if (old == null) throw const AppFailure('کیف پول انتخاب‌شده فعال نیست.');
+      final oldName = old.name;
+      final oldDescription = old.description;
       final cleanDescription = _cleanNote(description);
       if (oldName == cleanName && oldDescription == cleanDescription) return;
       final normalized = NameNormalizer.normalize(cleanName);
-      final existing = await transaction.query(
-        'wallet',
-        columns: ['wallet_id'],
-        where: 'normalized_name = ? AND wallet_id <> ?',
-        whereArgs: [normalized, walletId],
-        limit: 1,
-      );
-      if (existing.isNotEmpty) {
+      if (await catalog.walletNameExists(
+        normalized,
+        excludingWalletId: walletId,
+      )) {
         throw const AppFailure('این کیف پول پیش از این ثبت شده است.');
       }
-      await transaction.update(
-        'wallet',
-        {
-          'wallet_name': cleanName,
-          'normalized_name': normalized,
-          'description': cleanDescription,
-        },
-        where: 'wallet_id = ?',
-        whereArgs: [walletId],
+      await catalog.updateWallet(
+        walletId,
+        cleanName,
+        normalized,
+        description: cleanDescription,
       );
       final changes = <String>[];
       if (oldName != cleanName) changes.add('نام: $oldName ← $cleanName');
@@ -105,31 +92,18 @@ class TransactionService {
           'توضیحات: ${oldDescription ?? '—'} ← ${cleanDescription ?? '—'}',
         );
       }
-      await transaction.insert('wallet_activity', {
-        'wallet_id': walletId,
-        'event_type': 'updated',
-        'details': changes.join('\n'),
-      });
+      await catalog.insertWalletActivity(
+        walletId: walletId,
+        eventType: 'updated',
+        details: changes.join('\n'),
+      );
     });
   }
 
   Future<List<Map<String, Object?>>> walletActivities(
     int walletId, {
     int? limit,
-  }) async {
-    final suffix = limit == null ? '' : ' LIMIT $limit';
-    return _database.rawQuery(
-      '''
-      SELECT a.activity_id, a.wallet_id, a.event_type, a.occurred_at, a.details,
-        t.transaction_date, t.amount_minor, t.note
-      FROM wallet_activity a
-      LEFT JOIN wallet_transaction t ON t.transaction_id = a.transaction_id
-      WHERE a.wallet_id = ?
-      ORDER BY a.occurred_at DESC, a.activity_id DESC$suffix
-      ''',
-      [walletId],
-    );
-  }
+  }) => CatalogRepository(_database).walletActivities(walletId, limit: limit);
 
   Future<int> deposit({
     required int walletId,
@@ -573,7 +547,8 @@ class TransactionService {
   }) {
     _validateAmount(amountMinor);
     return _database.transaction((transaction) async {
-      if (await CatalogRepository(transaction).activeWallet(walletId) == null) {
+      final catalog = CatalogRepository(transaction);
+      if (await catalog.activeWallet(walletId) == null) {
         throw const AppFailure('کیف پول انتخاب‌شده فعال نیست.');
       }
       final id = await FinancialRepository(transaction).insertTransaction(
@@ -584,12 +559,12 @@ class TransactionService {
         note: _cleanNote(note),
       );
       if (type == 'deposit') {
-        await transaction.insert('wallet_activity', {
-          'wallet_id': walletId,
-          'event_type': 'deposit',
-          'transaction_id': id,
-          'details': _cleanNote(note),
-        });
+        await catalog.insertWalletActivity(
+          walletId: walletId,
+          eventType: 'deposit',
+          transactionId: id,
+          details: _cleanNote(note),
+        );
       }
       return id;
     });

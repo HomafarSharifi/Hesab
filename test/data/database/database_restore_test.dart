@@ -112,6 +112,61 @@ void main() {
       expect(restoredRows.single['category_name'], 'داده پشتیبان');
     },
   );
+
+  test(
+    'restore rejects backups missing the purchase allocation table',
+    () async {
+      final fixture = await _createBackupFixture();
+      addTearDown(() async {
+        await fixture.database.close();
+        await fixture.directory.delete(recursive: true);
+      });
+      final service = DatabaseMaintenanceService(fixture.database);
+      await service.createBackup(fixture.backupPath);
+
+      final damagedBackup = await databaseFactoryFfi.openDatabase(
+        fixture.backupPath,
+      );
+      await damagedBackup.execute('DROP TABLE purchase_wallet_allocation');
+      await damagedBackup.close();
+      await _addCategory(fixture.database, 'داده فعال');
+
+      await expectLater(
+        service.restore(fixture.backupPath),
+        throwsA(isA<FormatException>()),
+      );
+      expect(await _backupCategoryNames(await fixture.database.path), [
+        'داده نخست',
+        'داده فعال',
+      ]);
+    },
+  );
+
+  test('restore rejects backups missing the wallet balance view', () async {
+    final fixture = await _createBackupFixture();
+    addTearDown(() async {
+      await fixture.database.close();
+      await fixture.directory.delete(recursive: true);
+    });
+    final service = DatabaseMaintenanceService(fixture.database);
+    await service.createBackup(fixture.backupPath);
+
+    final damagedBackup = await databaseFactoryFfi.openDatabase(
+      fixture.backupPath,
+    );
+    await damagedBackup.execute('DROP VIEW wallet_balances');
+    await damagedBackup.close();
+    await _addCategory(fixture.database, 'داده فعال');
+
+    await expectLater(
+      service.restore(fixture.backupPath),
+      throwsA(isA<FormatException>()),
+    );
+    expect(await _backupCategoryNames(await fixture.database.path), [
+      'داده نخست',
+      'داده فعال',
+    ]);
+  });
 }
 
 Future<_BackupFixture> _createBackupFixture() async {

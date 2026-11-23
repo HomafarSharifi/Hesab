@@ -8,6 +8,56 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'initial deposit and wallet writes roll back together on failure',
+    () async {
+      sqfliteFfiInit();
+      final database = await databaseFactoryFfi.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(
+          version: HesabMigrations.currentVersion,
+          onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+          onCreate: HesabMigrations.onCreate,
+        ),
+      );
+      addTearDown(database.close);
+
+      final transactions = TransactionService(database);
+      await transactions.createWalletWithInitialDeposit(
+        walletName: 'اصلی',
+        amountMinor: 1250,
+        description: 'پول آغازین',
+      );
+      expect(await database.query('wallet'), hasLength(1));
+      expect(await database.query('wallet_transaction'), hasLength(1));
+      expect(await database.query('wallet_activity'), hasLength(2));
+      expect(
+        (await CatalogRepository(database).activeWallet(1))!.balanceMinor,
+        1250,
+      );
+
+      await database.execute('''
+      CREATE TRIGGER fail_initial_deposit_activity
+      BEFORE INSERT ON wallet_activity
+      WHEN NEW.event_type = 'deposit'
+      BEGIN
+        SELECT RAISE(ABORT, 'simulated_activity_failure');
+      END
+    ''');
+
+      await expectLater(
+        transactions.createWalletWithInitialDeposit(
+          walletName: 'گرفتار',
+          amountMinor: 2500,
+        ),
+        throwsA(isA<Exception>()),
+      );
+      expect(await database.query('wallet'), hasLength(1));
+      expect(await database.query('wallet_transaction'), hasLength(1));
+      expect(await database.query('wallet_activity'), hasLength(2));
+    },
+  );
+
   test('wallet creation, funding, and edits are audited atomically', () async {
     sqfliteFfiInit();
     final database = await databaseFactoryFfi.openDatabase(

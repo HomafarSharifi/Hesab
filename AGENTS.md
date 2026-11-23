@@ -3,7 +3,7 @@
 ## Product and current status
 
 - Hesab is a Dari-first Flutter and Dart application with a responsive Windows desktop shell and compact navigation at narrow window widths.
-- Hesab uses a local SQLite database. The RTL Dari shell, dashboard, database bootstrap/schema, repositories, catalog management, wallet deposits/withdrawals, atomic purchases, purchase reversals, Jalali reports, and filtered Expenses XLSX/CSV export are implemented. Report import and complete backup/restore remain planned.
+- Hesab uses a local SQLite database. The RTL Dari shell, dashboard, database bootstrap/schema, repositories, catalog management, wallet deposits/withdrawals, atomic purchases, purchase reversals, Jalali reports, filtered Expenses XLSX/CSV export, and validated local database backup/restore are implemented. Report import remains planned.
 - Treat the supplied UI reference (`UI refence.png`) as the visual source of truth. Implement it with real Flutter widgets and preserve its RTL composition.
 - Use Dari throughout the product interface. Use the Jalali calendar with Afghan month names: حمل، ثور، جوزا، سرطان، اسد، سنبله، میزان، عقرب، قوس، جدی، دلو، حوت.
 - Use the supplied Yekan Bakh font assets under `asset/YekanBakh/`; do not substitute a generic font without approval.
@@ -40,4 +40,4 @@
 ## Handoff
 
 - Keep the README's development status current and distinguish implemented behavior from planned requirements.
-- At each task handoff, report completed work, unresolved issues, and one exact next task. Current next task: implement safe local database backup/restore with validation and rollback protection, then add recovery tests.
+- At each task handoff, report completed work, unresolved issues, and one exact next task.

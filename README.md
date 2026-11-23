@@ -20,7 +20,7 @@ Confirmed financial rules include zero-balance wallets funded by deposits; atomi
 
 ## Development status
 
-The repository includes the supplied dashboard reference (`UI refence.png`), logical schema (`database schema.txt`), and Yekan Bakh font assets. The application opens a local SQLite database and creates its version 3 schema. Financial records are immutable; corrections use reversal transactions. Purchase totals use arbitrary-precision integer arithmetic and round positive half-minor-unit ties up. Backups use consistent SQLite snapshots; restores validate the schema version, required tables, foreign-key relationships, and database integrity before replacing the active database, keeping a rollback copy until the new database opens successfully. See [docs/database.md](docs/database.md) for details.
+The repository includes the supplied dashboard reference (`UI refence.png`), logical schema (`database schema.txt`), and Yekan Bakh font assets. The application opens a local SQLite database at schema version 5. Financial records are immutable; corrections use reversal transactions. Purchase totals use arbitrary-precision integer arithmetic and round positive half-minor-unit ties up. Backups use consistent SQLite snapshots. Restore validates the supported schema version, required tables, foreign-key relationships, and database integrity before replacing the active database. Replacement keeps a rollback copy while the new database is opened, and attempts recovery if replacement fails; filesystem failures can also prevent rollback and may leave recovery files. See [docs/database.md](docs/database.md) for details.
 
 Empty screens now use a shared Dari message, flow-specific action, and a cohesive set of SVG illustrations in `asset/illustrations/`. See [docs/empty_states.md](docs/empty_states.md) for the filenames and directions.
 
@@ -28,7 +28,7 @@ Empty screens now use a shared Dari message, flow-specific action, and a cohesiv
 
 From the project directory, run `flutter pub get`, then `flutter build windows`. A Windows Release build has been verified with the Flutter SDK installed on this machine; the executable is written to `build/windows/x64/runner/Release/hesab.exe`.
 
-See [docs/database.md](docs/database.md) for the version 1 SQLite schema, exact-number rules, migration strategy, and current boundaries.
+Run `flutter test` for the test suite and `flutter analyze` for static analysis. See [docs/database.md](docs/database.md) for the version 1 SQLite schema baseline, current schema version, exact-number rules, migration strategy, and current boundaries.
 
 ## License
 

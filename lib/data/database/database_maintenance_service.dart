@@ -167,8 +167,9 @@ class DatabaseMaintenanceService {
       if (version != HesabMigrations.currentVersion) {
         throw FormatException('Unsupported Hesab backup version: $version.');
       }
-      final tables = await database.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type = 'table'",
+      final schemaObjects = await database.rawQuery(
+        "SELECT type, name FROM sqlite_master "
+        "WHERE type IN ('table', 'view')",
       );
       const required = {
         'category',
@@ -178,9 +179,18 @@ class DatabaseMaintenanceService {
         'wallet_activity',
         'wallet_transaction',
         'expense',
+        'purchase_wallet_allocation',
       };
-      final found = tables.map((row) => row['name'] as String).toSet();
-      if (!found.containsAll(required)) {
+      final foundTables = schemaObjects
+          .where((row) => row['type'] == 'table')
+          .map((row) => row['name'] as String)
+          .toSet();
+      final foundViews = schemaObjects
+          .where((row) => row['type'] == 'view')
+          .map((row) => row['name'] as String)
+          .toSet();
+      if (!foundTables.containsAll(required) ||
+          !foundViews.contains('wallet_balances')) {
         throw const FormatException('Backup does not contain Hesab data.');
       }
       final violations = await database.rawQuery('PRAGMA foreign_key_check');
