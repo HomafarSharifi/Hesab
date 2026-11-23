@@ -14,6 +14,7 @@ import '../services/expense_excel_exporter.dart';
 import '../services/expense_export_file_saver.dart';
 import '../widgets/expense_export_dialog.dart';
 import '../../shared/widgets/jalali_date_picker_dialog.dart';
+import '../../shared/widgets/app_empty_state.dart';
 
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({
@@ -21,6 +22,7 @@ class ExpensesScreen extends StatefulWidget {
     required this.fromDate,
     required this.toDate,
     this.newPurchaseRequest = 0,
+    required this.onCreateWallet,
     super.key,
   });
 
@@ -28,6 +30,7 @@ class ExpensesScreen extends StatefulWidget {
   final DateTime fromDate;
   final DateTime? toDate;
   final int newPurchaseRequest;
+  final VoidCallback onCreateWallet;
 
   @override
   State<ExpensesScreen> createState() => _ExpensesScreenState();
@@ -387,7 +390,41 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       JalaliDate.fromGregorian(DateTime.parse(date)).fullDate;
 
   @override
-  Widget build(BuildContext context) => Directionality(
+  Widget build(BuildContext context) => FutureBuilder<ExpensePageResult>(
+    future: _loadExpenses(),
+    builder: (context, snapshot) {
+      final empty = snapshot.data?.records.isEmpty == true;
+      if (snapshot.connectionState == ConnectionState.done &&
+          !snapshot.hasError &&
+          empty &&
+          _search.isEmpty &&
+          _categoryFilter == null &&
+          _walletFilter == null) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AppEmptyState(
+            illustration: 'expenses-empty',
+            message: 'در این دوره خریدی ثبت نشده است.',
+            actionLabel: 'ثبت خرید',
+            onAction: _createFirstExpense,
+          ),
+        );
+      }
+      return _buildExpensesContent(context);
+    },
+  );
+
+  Future<void> _createFirstExpense() async {
+    final wallets = await widget.services.catalog.wallets();
+    if (!mounted) return;
+    if (wallets.isEmpty) {
+      widget.onCreateWallet();
+    } else {
+      await _newPurchase();
+    }
+  }
+
+  Widget _buildExpensesContent(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Padding(
       padding: EdgeInsetsDirectional.fromSTEB(

@@ -7,11 +7,14 @@ import '../../../data/models/catalog_models.dart';
 import '../../../data/models/financial_models.dart';
 import '../widgets/dashboard_cards.dart';
 import '../widgets/dashboard_charts.dart';
+import '../../shared/widgets/app_empty_state.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     required this.services,
     required this.onAddFunds,
+    required this.onCreateWallet,
+    required this.onCreatePurchase,
     required this.fromDate,
     required this.toDate,
     required this.selectedPeriod,
@@ -20,6 +23,8 @@ class DashboardScreen extends StatefulWidget {
 
   final HesabServices services;
   final VoidCallback onAddFunds;
+  final VoidCallback onCreateWallet;
+  final VoidCallback onCreatePurchase;
   final DateTime fromDate;
   final DateTime? toDate;
   final int selectedPeriod;
@@ -50,6 +55,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       toDate: widget.toDate,
     );
     return _DashboardData(
+      hasWallets: wallets.isNotEmpty,
       balanceMinor: wallets.fold<int>(
         0,
         (sum, wallet) => sum + wallet.balanceMinor,
@@ -63,6 +69,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildWithData(BuildContext context, _DashboardData? data) {
+    if (data != null &&
+        (!data.hasWallets || data.report.purchaseCount == 0)) {
+      final hasWallets = data.hasWallets;
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: AppEmptyState(
+          illustration: hasWallets ? 'dashboard-empty' : 'wallets-empty',
+          message: hasWallets
+              ? 'هنوز خریدی ثبت نشده است.'
+              : 'هنوز کیف پولی نساخته‌اید.',
+          actionLabel: hasWallets ? 'ثبت خرید' : 'ساخت کیف پول',
+          onAction: hasWallets
+              ? widget.onCreatePurchase
+              : widget.onCreateWallet,
+        ),
+      );
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final stageWidth = math.max(constraints.maxWidth, 1040.0);
@@ -160,6 +183,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 class _DashboardData {
   const _DashboardData({
+    required this.hasWallets,
     required this.balanceMinor,
     required this.spentMinor,
     required this.receivedMinor,
@@ -169,6 +193,7 @@ class _DashboardData {
   });
 
   final int balanceMinor;
+  final bool hasWallets;
   final int spentMinor;
   final int receivedMinor;
   final ReportSummary report;

@@ -6,6 +6,7 @@ import '../../../core/finance/grouped_amount_input_formatter.dart';
 import '../../../core/calendar/jalali_date.dart';
 import '../../../core/theme/hesab_theme.dart';
 import '../../../data/models/catalog_models.dart';
+import '../../shared/widgets/app_empty_state.dart';
 import '../../shared/widgets/jalali_date_picker_dialog.dart';
 
 class WalletScreen extends StatefulWidget {
@@ -183,7 +184,16 @@ class _WalletScreenState extends State<WalletScreen> {
     List<WalletRecord> wallets,
   ) => Padding(
     padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 28),
-    child: Center(
+    child: snapshot.connectionState == ConnectionState.done &&
+            !snapshot.hasError &&
+            wallets.isEmpty
+        ? AppEmptyState(
+            illustration: 'wallets-empty',
+            message: 'هنوز کیف پولی نساخته‌اید.',
+            actionLabel: 'ساخت کیف پول',
+            onAction: _create,
+          )
+        : Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 840),
         child: Column(
@@ -213,8 +223,6 @@ class _WalletScreenState extends State<WalletScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : snapshot.hasError
                   ? Center(child: Text('بارگذاری انجام نشد: ${snapshot.error}'))
-                  : wallets.isEmpty
-                  ? const Center(child: Text('کیف پولی ثبت نشده است.'))
                   : ListView.separated(
                       itemCount: wallets.length,
                       separatorBuilder: (_, _) => const Divider(height: 1),

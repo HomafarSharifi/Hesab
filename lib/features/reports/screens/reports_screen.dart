@@ -4,17 +4,22 @@ import '../../../app/hesab_services.dart';
 import '../../../core/finance/amount_codec.dart';
 import '../../../core/theme/hesab_theme.dart';
 import '../../../data/models/financial_models.dart';
+import '../../shared/widgets/app_empty_state.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({
     required this.services,
     required this.fromDate,
     required this.toDate,
+    required this.onCreatePurchase,
+    required this.onCreateWallet,
     super.key,
   });
   final HesabServices services;
   final DateTime fromDate;
   final DateTime? toDate;
+  final VoidCallback onCreatePurchase;
+  final VoidCallback onCreateWallet;
 
   @override
   Widget build(BuildContext context) => Directionality(
@@ -29,6 +34,22 @@ class ReportsScreen extends StatelessWidget {
             ? const Center(child: CircularProgressIndicator())
             : snapshot.hasError
             ? Center(child: Text('گزارش آماده نشد: ${snapshot.error}'))
+            : snapshot.data!.purchaseCount == 0
+            ? AppEmptyState(
+                illustration: 'reports-empty',
+                message: 'برای این دوره گزارشی از خریدها موجود نیست.',
+                actionLabel: 'شروع ثبت اطلاعات',
+                onAction: () async {
+                  final wallets = await services.catalog.wallets();
+                  if (context.mounted) {
+                    if (wallets.isEmpty) {
+                      onCreateWallet();
+                    } else {
+                      onCreatePurchase();
+                    }
+                  }
+                },
+              )
             : _ReportContent(summary: snapshot.data!),
       ),
     ),

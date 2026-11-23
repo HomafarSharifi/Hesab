@@ -4,6 +4,7 @@ import '../../../app/hesab_services.dart';
 import '../../../core/theme/hesab_theme.dart';
 import '../../../core/text/name_normalizer.dart';
 import '../../../data/models/catalog_models.dart';
+import '../../shared/widgets/app_empty_state.dart';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({required this.services, super.key});
@@ -174,7 +175,31 @@ class _CatalogScreenState extends State<CatalogScreen> {
           1 => widget.services.catalog.categories(),
           _ => widget.services.catalog.units(),
         },
-        builder: (context, snapshot) => Padding(
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done &&
+              !snapshot.hasError &&
+              (_tab != 0 || _search.isEmpty) &&
+              _isCurrentListEmpty(snapshot.data)) {
+            return AppEmptyState(
+              illustration: switch (_tab) {
+                0 => 'catalog-items-empty',
+                1 => 'catalog-categories-empty',
+                _ => 'catalog-units-empty',
+              },
+              message: switch (_tab) {
+                0 => 'هنوز جنسی ثبت نشده است.',
+                1 => 'هنوز دسته‌بندی‌ای ثبت نشده است.',
+                _ => 'هنوز واحدی ثبت نشده است.',
+              },
+              actionLabel: switch (_tab) {
+                0 => 'افزودن جنس',
+                1 => 'افزودن دسته‌بندی',
+                _ => 'افزودن واحد',
+              },
+              onAction: _create,
+            );
+          }
+          return Padding(
           padding: EdgeInsets.all(
             MediaQuery.sizeOf(context).width < 600 ? 12 : 24,
           ),
@@ -235,9 +260,21 @@ class _CatalogScreenState extends State<CatalogScreen> {
               Expanded(child: _rows(snapshot)),
             ],
           ),
-        ),
+          );
+        },
       ),
     );
+  }
+
+  bool _isCurrentListEmpty(Object? data) {
+    if (data is! List) return false;
+    if (_tab == 0 || NameNormalizer.normalize(_search).isEmpty) {
+      return data.isEmpty;
+    }
+    final query = NameNormalizer.normalize(_search);
+    return data.where((value) =>
+      NameNormalizer.normalize(value.name).contains(query),
+    ).isEmpty;
   }
 
   Widget _rows(AsyncSnapshot<Object> snapshot) {

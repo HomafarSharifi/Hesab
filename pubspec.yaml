@@ -67,6 +67,7 @@ flutter:
     - asset/icon.png
     - asset/logo.svg
     - asset/icons/
+    - asset/illustrations/
 
   fonts:
     - family: YekanBakh
