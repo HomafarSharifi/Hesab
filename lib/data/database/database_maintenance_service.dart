@@ -7,19 +7,87 @@ import 'migrations/hesab_migrations.dart';
 
 /// Creates and installs complete, validated local database backups.
 class DatabaseMaintenanceService {
-  DatabaseMaintenanceService(this._database);
+  DatabaseMaintenanceService(
+    this._database, {
+    BackupFileInstaller? backupFileInstaller,
+  }) : _backupFileInstaller = backupFileInstaller ?? _renameBackupFile;
 
   final HesabDatabase _database;
+  final BackupFileInstaller _backupFileInstaller;
 
   Future<void> createBackup(String destinationPath) async {
     final destination = File(destinationPath);
     await _rejectDatabasePath(destination.path);
-    final partial = File('$destinationPath.partial');
-    if (await partial.exists()) await partial.delete();
-    final escapedPath = partial.path.replaceAll("'", "''");
-    await (await _database.database).execute("VACUUM INTO '$escapedPath'");
-    if (await destination.exists()) await destination.delete();
-    await partial.rename(destinationPath);
+    final partial = await _uniqueSibling(destination, 'partial');
+    File? previous;
+    try {
+      final escapedPath = partial.path.replaceAll("'", "''");
+      await (await _database.database).execute("VACUUM INTO '$escapedPath'");
+      await _validateBackup(partial.path);
+
+      if (await destination.exists()) {
+        previous = await _uniqueSibling(destination, 'previous');
+        await destination.rename(previous.path);
+      }
+
+      try {
+        await _backupFileInstaller(partial, destination.path);
+      } on Object catch (promotionError, promotionStack) {
+        final heldPrevious = previous;
+        if (heldPrevious != null && await heldPrevious.exists()) {
+          try {
+            // Do not overwrite a file that may have appeared concurrently.
+            if (!await destination.exists()) {
+              await heldPrevious.rename(destination.path);
+              previous = null;
+            }
+          } on Object catch (rollbackError) {
+            Error.throwWithStackTrace(
+              FileSystemException(
+                'Backup replacement failed ($promotionError); the previous '
+                'backup is preserved at ${heldPrevious.path}, but restoring it '
+                'to ${destination.path} also failed: $rollbackError',
+              ),
+              promotionStack,
+            );
+          }
+        }
+        Error.throwWithStackTrace(promotionError, promotionStack);
+      }
+
+      // The new backup is in place. Failure to remove this extra old copy
+      // must not turn a successful replacement into a reported failure.
+      if (previous != null && await previous.exists()) {
+        try {
+          await previous.delete();
+        } on FileSystemException {
+          // Preserve the old copy if the filesystem will not remove it.
+        }
+      }
+    } finally {
+      if (await partial.exists()) {
+        try {
+          await partial.delete();
+        } on FileSystemException {
+          // A failed cleanup leaves only the uniquely named temporary file.
+        }
+      }
+    }
+  }
+
+  static Future<File> _renameBackupFile(File source, String destination) =>
+      source.rename(destination);
+
+  Future<File> _uniqueSibling(File destination, String purpose) async {
+    final base =
+        '${destination.path}.$pid.${DateTime.now().microsecondsSinceEpoch}';
+    var candidate = File('$base.$purpose');
+    var suffix = 0;
+    while (await candidate.exists()) {
+      suffix++;
+      candidate = File('$base.$suffix.$purpose');
+    }
+    return candidate;
   }
 
   Future<void> clear() async {
@@ -135,3 +203,12 @@ class DatabaseMaintenanceService {
     }
   }
 }
+
+/// Installs a completed backup file at its destination.
+///
+/// Injectable so backup promotion failures can be tested without relying on
+/// platform-specific file locking or rename semantics.
+typedef BackupFileInstaller = Future<File> Function(
+  File source,
+  String destinationPath,
+);

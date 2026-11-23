@@ -41,8 +41,8 @@ void main() {
     await tester.tap(find.text('بازکردن'));
     await tester.pumpAndSettle();
 
-    expect(find.text('۳ صفحه، ۱۰۱ مورد'), findsOneWidget);
-    expect(find.text('صفحه ۳: ۱۰۱–۱۰۱'), findsOneWidget);
+    expect(find.text('3 صفحه، 101 مورد'), findsOneWidget);
+    expect(find.text('صفحه 3: 101–101'), findsOneWidget);
 
     await tester.tap(find.text('پاک‌کردن انتخاب'));
     await tester.pump();
@@ -53,7 +53,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('export-page-1')));
     await tester.pump();
-    expect(find.text('انتخاب‌شده: ۱ صفحه، ۵۰ مورد'), findsOneWidget);
+    expect(find.text('انتخاب‌شده: 1 صفحه، 50 مورد'), findsOneWidget);
 
     await tester.tap(find.text('CSV (.csv)'));
     await tester.pump();
@@ -64,8 +64,8 @@ void main() {
       find.text('دیتا تازه شد؛ صفحه‌ها و شمارش‌ها را بازبینی کنید.'),
       findsOneWidget,
     );
-    expect(find.text('۴ صفحه، ۱۵۱ مورد'), findsOneWidget);
-    expect(find.text('صفحه ۴: ۱۵۱–۱۵۱'), findsOneWidget);
+    expect(find.text('4 صفحه، 151 مورد'), findsOneWidget);
+    expect(find.text('صفحه 4: 151–151'), findsOneWidget);
 
     await tester.tap(find.text('خروجی گرفتن'));
     await tester.pumpAndSettle();

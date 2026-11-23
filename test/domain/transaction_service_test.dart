@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hesab/core/errors/app_failure.dart';
 import 'package:hesab/data/database/migrations/hesab_migrations.dart';
 import 'package:hesab/data/repositories/catalog_repository.dart';
+import 'package:hesab/data/repositories/report_repository.dart';
 import 'package:hesab/domain/services/catalog_service.dart';
 import 'package:hesab/domain/services/transaction_service.dart';
 import 'package:hesab/domain/services/report_service.dart';
@@ -76,7 +77,12 @@ void main() {
         5000,
       );
       expect((await service.expenses()).single.isReversed, isTrue);
-      expect((await ReportService(database).summary()).totalExpenseMinor, 0);
+      expect(
+        (await ReportService(
+          ReportRepository(database),
+        ).summary()).totalExpenseMinor,
+        0,
+      );
 
       await expectLater(
         service.purchaseWithNewProduct(

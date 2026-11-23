@@ -83,6 +83,11 @@ void main() {
             'unit_price_minor': 1,
             if (index.isEven) 'note': null,
           });
+          await transaction.insert('purchase_wallet_allocation', {
+            'transaction_id': transactionId,
+            'wallet_id': 1,
+            'amount_minor': 1,
+          });
         }
       });
 

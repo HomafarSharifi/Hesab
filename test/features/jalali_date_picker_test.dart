@@ -27,12 +27,12 @@ void main() {
 
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
-    expect(find.text('حمل ۱۴۰۳'), findsOneWidget);
-    expect(find.textContaining('۱ حمل ۱۴۰۳'), findsOneWidget);
+    expect(find.text('حمل 1403'), findsOneWidget);
+    expect(find.textContaining('1 حمل 1403'), findsOneWidget);
 
-    await tester.tap(find.text('۲'));
+    await tester.tap(find.text('2'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('۲ حمل ۱۴۰۳'), findsOneWidget);
+    expect(find.textContaining('2 حمل 1403'), findsOneWidget);
     await tester.tap(find.text('تأیید'));
     await tester.pumpAndSettle();
 

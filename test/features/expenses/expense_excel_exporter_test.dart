@@ -43,7 +43,7 @@ void main() {
     expect(headers.any((header) => header.contains('میلادی')), isFalse);
     expect(
       (secondPage.rows[1][1]!.value as TextCellValue).value.text,
-      '۱ حمل ۱۴۰۳',
+      '1 حمل 1403',
     );
     expect(_numberValue(secondPage.rows[1][5]!.value), 2.5);
     expect(_numberValue(secondPage.rows[1][7]!.value), 50.0);

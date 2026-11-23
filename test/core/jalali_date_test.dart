@@ -9,7 +9,7 @@ void main() {
     expect((secondDay.year, secondDay.month, secondDay.day), (1403, 1, 2));
     expect(
       const JalaliDate(year: 1403, month: 1, day: 1).fullDate,
-      '۱ حمل ۱۴۰۳',
+      '1 حمل 1403',
     );
   });
 
