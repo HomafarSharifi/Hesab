@@ -91,7 +91,7 @@ class _ReportContent extends StatelessWidget {
               );
               final monthList = _ReportList(
                 title: 'مصارف ماهانه (تقویم جلالی)',
-                empty: 'معلومات ماهانه موجود نیست.',
+                empty: 'دیتا ماهانه موجود نیست.',
                 children: [
                   for (final entry in months)
                     _ReportRow(

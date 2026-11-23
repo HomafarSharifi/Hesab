@@ -12,11 +12,15 @@ class HesabApp extends StatefulWidget {
   const HesabApp({
     required this.services,
     required this.onDatabaseChanged,
+    required this.themeMode,
+    required this.onThemeModeChanged,
     super.key,
   });
 
   final HesabServices services;
   final VoidCallback onDatabaseChanged;
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode> onThemeModeChanged;
 
   @override
   State<HesabApp> createState() => _HesabAppState();
@@ -25,13 +29,13 @@ class HesabApp extends StatefulWidget {
 class _HesabAppState extends State<HesabApp> {
   static const _windowChannel = MethodChannel('hesab/window');
 
-  ThemeMode? _themeMode;
   int? _lastCaptionBackground;
   int? _lastCaptionForeground;
 
-  void _toggleTheme(bool isDarkMode) => setState(
-    () => _themeMode = isDarkMode ? ThemeMode.light : ThemeMode.dark,
-  );
+  void _toggleTheme(bool isDarkMode) {
+    final mode = isDarkMode ? ThemeMode.light : ThemeMode.dark;
+    widget.onThemeModeChanged(mode);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +47,7 @@ class _HesabAppState extends State<HesabApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: HesabTheme.light,
       darkTheme: HesabTheme.dark,
-      themeMode: _themeMode ?? ThemeMode.system,
+      themeMode: widget.themeMode,
       builder: (context, child) {
         final colors = Theme.of(context).colorScheme;
         final captionBackground = colors.primary.toARGB32();

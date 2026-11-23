@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../app/hesab_services.dart';
 import '../../../core/theme/hesab_theme.dart';
+import '../../../core/text/name_normalizer.dart';
 import '../../../data/models/catalog_models.dart';
 
 class CatalogScreen extends StatefulWidget {
@@ -15,6 +16,14 @@ class CatalogScreen extends StatefulWidget {
 class _CatalogScreenState extends State<CatalogScreen> {
   int _tab = 0;
   int _revision = 0;
+  final _searchController = TextEditingController();
+  String _search = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _create() async {
     try {
@@ -114,7 +123,41 @@ class _CatalogScreenState extends State<CatalogScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+          SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', '')),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editItem(ItemRecord item) async {
+    try {
+      final categories = await widget.services.catalog.categories();
+      final units = await widget.services.catalog.units();
+      if (!mounted) return;
+      final result = await showDialog<({String name, int category, int unit})>(
+        context: context,
+        builder: (_) => _ItemDialog(
+          categories: categories,
+          units: units,
+          initialItem: item,
+        ),
+      );
+      if (result == null) return;
+      await widget.services.catalog.updateItem(
+        id: item.id,
+        name: result.name,
+        categoryId: result.category,
+        unitId: result.unit,
+      );
+      if (mounted) setState(() => _revision++);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', '')),
+          ),
         );
       }
     }
@@ -125,9 +168,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: FutureBuilder<Object>(
-        key: ValueKey('$_tab-$_revision'),
+        key: ValueKey('$_tab-$_search-$_revision'),
         future: switch (_tab) {
-          0 => widget.services.catalog.items(),
+          0 => widget.services.catalog.items(search: _search),
           1 => widget.services.catalog.categories(),
           _ => widget.services.catalog.units(),
         },
@@ -138,13 +181,42 @@ class _CatalogScreenState extends State<CatalogScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
+              Wrap(
+                alignment: WrapAlignment.start,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
-                  const Spacer(),
                   FilledButton.icon(
                     onPressed: _create,
                     icon: const Icon(Icons.add),
                     label: const Text('افزودن'),
+                  ),
+                  SizedBox(
+                    width: 240,
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (value) => setState(() => _search = value),
+                      decoration: InputDecoration(
+                        hintText: switch (_tab) {
+                          0 => 'جستجوی جنس',
+                          1 => 'جستجوی دسته‌بندی',
+                          _ => 'جستجوی واحد',
+                        },
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: _search.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: 'پاک کردن جستجو',
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _search = '');
+                                },
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -174,10 +246,20 @@ class _CatalogScreenState extends State<CatalogScreen> {
     }
     if (snapshot.hasError) {
       return Center(
-        child: Text('بارگذاری معلومات انجام نشد: ${snapshot.error}'),
+        child: Text('بارگذاری دیتا انجام نشد: ${snapshot.error}'),
       );
     }
-    final values = snapshot.data! as List;
+    final loadedValues = snapshot.data! as List;
+    final normalizedSearch = NameNormalizer.normalize(_search);
+    final values = _tab == 0 || normalizedSearch.isEmpty
+        ? loadedValues
+        : loadedValues
+              .where(
+                (value) =>
+                    NameNormalizer.normalize(value.name)
+                        .contains(normalizedSearch),
+              )
+              .toList();
     if (values.isEmpty) {
       return const Center(child: Text('هنوز چیزی ثبت نشده است.'));
     }
@@ -205,17 +287,23 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 IconButton(
                   tooltip: 'ویرایش',
                   icon: const Icon(Icons.edit_outlined),
-                  onPressed: () => _editName(
-                    _tab == 0 ? 'item' : _tab == 1 ? 'category' : 'unit',
-                    id,
-                    label,
-                  ),
+                  onPressed: () {
+                    if (isItem) {
+                      _editItem(value);
+                    } else {
+                      _editName(_tab == 1 ? 'category' : 'unit', id, label);
+                    }
+                  },
                 ),
                 IconButton(
                   tooltip: 'حذف',
                   icon: const Icon(Icons.delete_outline),
                   onPressed: () => _delete(
-                    _tab == 0 ? 'item' : _tab == 1 ? 'category' : 'unit',
+                    _tab == 0
+                        ? 'item'
+                        : _tab == 1
+                        ? 'category'
+                        : 'unit',
                     id,
                     label,
                   ),
@@ -270,17 +358,32 @@ class _NameDialogState extends State<_NameDialog> {
 }
 
 class _ItemDialog extends StatefulWidget {
-  const _ItemDialog({required this.categories, required this.units});
+  const _ItemDialog({
+    required this.categories,
+    required this.units,
+    this.initialItem,
+  });
   final List<CategoryRecord> categories;
   final List<UnitRecord> units;
+  final ItemRecord? initialItem;
   @override
   State<_ItemDialog> createState() => _ItemDialogState();
 }
 
 class _ItemDialogState extends State<_ItemDialog> {
-  final _name = TextEditingController();
+  late final _name = TextEditingController(
+    text: widget.initialItem?.name ?? '',
+  );
   int? _category;
   int? _unit;
+
+  @override
+  void initState() {
+    super.initState();
+    _category = widget.initialItem?.categoryId;
+    _unit = widget.initialItem?.unitId;
+  }
+
   @override
   void dispose() {
     _name.dispose();
@@ -289,7 +392,7 @@ class _ItemDialogState extends State<_ItemDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('جنس تازه'),
+    title: Text(widget.initialItem == null ? 'جنس تازه' : 'ویرایش جنس'),
     content: SizedBox(
       width: 360,
       child: Column(

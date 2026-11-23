@@ -42,7 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirmed = await _confirm(
       title: 'بازیابی نسخه پشتیبان؟',
       message:
-          'تمام معلومات فعلی با معلومات فایل پشتیبان جایگزین می‌شود. پیش از ادامه، یک نسخه پشتیبان از معلومات فعلی بگیرید.',
+          'تمام دیتا فعلی با دیتا فایل پشتیبان جایگزین می‌شود. پیش از ادامه، یک نسخه پشتیبان از دیتا فعلی بگیرید.',
       action: 'انتخاب فایل',
     );
     if (!confirmed || !mounted) return;
@@ -58,7 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (path == null) return;
     final success = await _run(
       () => widget.services.databaseMaintenance.restore(path),
-      successMessage: 'معلومات با موفقیت بازیابی شد.',
+      successMessage: 'دیتا با موفقیت بازیابی شد.',
     );
     if (success && mounted) widget.onDatabaseChanged();
   }
@@ -68,7 +68,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!confirmed || !mounted) return;
     final success = await _run(
       widget.services.databaseMaintenance.clear,
-      successMessage: 'تمام معلومات پاک شد.',
+      successMessage: 'تمام دیتا پاک شد.',
     );
     if (success && mounted) widget.onDatabaseChanged();
   }
@@ -81,7 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             context: context,
             builder: (context) => StatefulBuilder(
               builder: (context, setDialogState) => AlertDialog(
-                title: const Text('پاک کردن تمام معلومات؟'),
+                title: const Text('پاک کردن تمام دیتا؟'),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -120,7 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: controller.text.trim() == challenge
                         ? () => Navigator.pop(context, true)
                         : null,
-                    child: const Text('پاک کردن معلومات'),
+                    child: const Text('پاک کردن دیتا'),
                   ),
                 ],
               ),
@@ -195,7 +195,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           const SizedBox(height: 6),
           Text(
-            'مدیریت معلومات',
+            'مدیریت دیتابیس',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontSize: HesabTheme.fontSection,
               fontWeight: FontWeight.w800,
@@ -208,21 +208,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingsAction(
                   icon: Icons.backup_outlined,
                   title: 'نسخه پشتیبان',
-                  subtitle: 'ذخیره یک نسخه کامل از پایگاه معلوماتی',
+                  subtitle: 'ذخیره یک نسخه کامل از دیتابیس',
                   onTap: _busy ? null : _backup,
                 ),
                 const Divider(height: 1),
                 _SettingsAction(
                   icon: Icons.restore_rounded,
                   title: 'بازیابی نسخه پشتیبان',
-                  subtitle: 'جایگزینی معلومات با فایل پشتیبان حساب',
+                  subtitle: 'جایگزینی دیتابیس با فایل بکآپ',
                   onTap: _busy ? null : _restore,
                 ),
                 const Divider(height: 1),
                 _SettingsAction(
                   icon: Icons.delete_forever_outlined,
-                  title: 'پاک کردن پایگاه معلوماتی',
-                  subtitle: 'حذف تمام معلومات ذخیره‌شده در این دستگاه',
+                  title: 'حذف دیتابیس',
+                  subtitle: 'حذف تمام دیتا ذخیره‌شده در این دستگاه',
                   destructive: true,
                   onTap: _busy ? null : _clear,
                 ),

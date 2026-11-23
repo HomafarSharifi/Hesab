@@ -679,9 +679,17 @@ class ReferenceCategoryBreakdownCard extends StatefulWidget {
 class _ReferenceCategoryBreakdownCardState
     extends State<ReferenceCategoryBreakdownCard> {
   int? _hoveredIndex;
+  final _categoryScrollController = ScrollController();
+  bool _categoryListHovered = false;
 
   static const Color _kActiveLime = Color(0xFF7FDF3C);
   static const Color _kActiveGreenText = Color(0xFF3E9B12);
+
+  @override
+  void dispose() {
+    _categoryScrollController.dispose();
+    super.dispose();
+  }
 
   int? _hitTest(Offset point, Size size, List<int> values, int total) {
     if (values.isEmpty || total <= 0) return null;
@@ -720,18 +728,21 @@ class _ReferenceCategoryBreakdownCardState
     final values = entries.map((entry) => entry.value).toList();
     final total = values.fold<int>(0, (sum, value) => sum + value);
 
-    final inactiveGray =
-        isDark ? const Color(0xFF424E48) : const Color(0xFF9EA09F);
+    final inactiveGray = isDark
+        ? const Color(0xFF424E48)
+        : const Color(0xFF9EA09F);
     final accentReadable = isDark ? _kActiveLime : _kActiveGreenText;
 
-    final largest =
-        values.isEmpty ? 0 : values.indexOf(values.reduce(math.max));
+    final largest = values.isEmpty
+        ? 0
+        : values.indexOf(values.reduce(math.max));
     final activeIndex = _hoveredIndex != null && _hoveredIndex! < entries.length
         ? _hoveredIndex!
         : largest;
     final active = entries.isEmpty ? null : entries[activeIndex];
-    final share =
-        active == null || total == 0 ? 0.0 : active.value / total * 100;
+    final share = active == null || total == 0
+        ? 0.0
+        : active.value / total * 100;
 
     return Container(
       decoration: BoxDecoration(
@@ -771,10 +782,7 @@ class _ReferenceCategoryBreakdownCardState
                 ),
               ),
               const SizedBox(width: 5),
-              _CategoryShareBadge(
-                share: share,
-                color: accentReadable,
-              ),
+              _CategoryShareBadge(share: share, color: accentReadable),
             ],
           ),
           const SizedBox(height: 8),
@@ -857,7 +865,7 @@ class _ReferenceCategoryBreakdownCardState
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             color: accentReadable,
-                                          fontSize: 6,
+                                            fontSize: 6,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
@@ -887,26 +895,50 @@ class _ReferenceCategoryBreakdownCardState
                             ),
                           ),
                         )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            for (
-                              var index = 0;
-                              index < math.min(entries.length, 4);
-                              index++
-                            )
-                              _ReferenceCategoryRow(
-                                name: entries[index].key,
-                                amount: entries[index].value,
-                                color: index == activeIndex
-                                    ? _kActiveLime
-                                    : inactiveGray,
-                                active: index == activeIndex,
-                                onHover: (hovering) => setState(
-                                  () => _hoveredIndex = hovering ? index : null,
-                                ),
+                      : MouseRegion(
+                          onEnter: (_) {
+                            if (!_categoryListHovered) {
+                              setState(() => _categoryListHovered = true);
+                            }
+                          },
+                          onExit: (_) {
+                            if (_categoryListHovered) {
+                              setState(() => _categoryListHovered = false);
+                            }
+                          },
+                          child: ScrollConfiguration(
+                            behavior: ScrollConfiguration.of(context)
+                                .copyWith(scrollbars: false),
+                            child: Scrollbar(
+                              controller: _categoryScrollController,
+                              thumbVisibility: _categoryListHovered,
+                              thickness: 4,
+                              radius: const Radius.circular(4),
+                              scrollbarOrientation: ScrollbarOrientation.right,
+                              child: ListView.separated(
+                                controller: _categoryScrollController,
+                                primary: false,
+                                padding: const EdgeInsets.only(right: 8),
+                                itemCount: entries.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 2),
+                                itemBuilder: (context, index) =>
+                                    _ReferenceCategoryRow(
+                                      name: entries[index].key,
+                                      amount: entries[index].value,
+                                      color: index == activeIndex
+                                          ? _kActiveLime
+                                          : inactiveGray,
+                                      active: index == activeIndex,
+                                      onHover: (hovering) => setState(
+                                        () => _hoveredIndex = hovering
+                                            ? index
+                                            : null,
+                                      ),
+                                    ),
                               ),
-                          ],
+                            ),
+                          ),
                         ),
                 ),
               ],
@@ -1016,8 +1048,10 @@ class _ReferenceDonutPainter extends CustomPainter {
     final alphaOut = math.asin(((h + cOut) / (outerR - cOut)).clamp(-1.0, 1.0));
     final alphaIn = math.asin(((h + cIn) / (innerR + cIn)).clamp(-1.0, 1.0));
 
-    Offset polar(double rad, double ang) =>
-        Offset(center.dx + rad * math.cos(ang), center.dy + rad * math.sin(ang));
+    Offset polar(double rad, double ang) => Offset(
+      center.dx + rad * math.cos(ang),
+      center.dy + rad * math.sin(ang),
+    );
 
     final cOs = polar(outerR - cOut, a0 + alphaOut);
     final cOe = polar(outerR - cOut, a1 - alphaOut);
@@ -1179,7 +1213,6 @@ class _ReferenceCategoryRow extends StatelessWidget {
     ),
   );
 }
-
 
 class CategoryBreakdownCard extends StatelessWidget {
   const CategoryBreakdownCard({

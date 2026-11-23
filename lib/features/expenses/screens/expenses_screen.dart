@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../../app/hesab_services.dart';
 import '../../../core/calendar/jalali_date.dart';
 import '../../../core/finance/amount_codec.dart';
+import '../../../core/finance/grouped_amount_input_formatter.dart';
 import '../../../core/text/name_normalizer.dart';
 import '../../../core/theme/hesab_theme.dart';
 import '../../../data/models/catalog_models.dart';
@@ -244,7 +245,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           pageSize: selection.pageSize,
         );
         if (page.totalCount != selection.expectedTotalCount) {
-          throw StateError('معلومات مصارف تغییر کرده است؛ دوباره تلاش کنید.');
+          throw StateError('دیتا مصارف تغییر کرده است؛ دوباره تلاش کنید.');
         }
         recordsByPage[pageIndex] = page.records;
       }
@@ -454,7 +455,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 if (snapshot.hasError) {
                   return Center(
                     child: Text(
-                      'بارگذاری معلومات انجام نشد: ${snapshot.error}',
+                      'بارگذاری دیتا انجام نشد: ${snapshot.error}',
                     ),
                   );
                 }
@@ -1267,6 +1268,7 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
                     ),
                     TextField(
                       controller: _price,
+                      inputFormatters: const [GroupedAmountInputFormatter()],
                       onChanged: (_) => setState(() {}),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,

@@ -231,10 +231,15 @@ class CatalogRepository {
     required int categoryId,
     required int unitId,
   }) async {
-    if (await _referenceCount('expense', 'item_id', id) > 0) {
-      throw const AppFailure(
-        'این جنس سابقه خرید دارد و برای حفظ تاریخچه ویرایش نمی‌شود.',
-      );
+    final duplicate = await _database.query(
+      'item',
+      columns: ['item_id'],
+      where: 'normalized_name = ? AND category_id = ? AND unit_id = ? AND item_id <> ?',
+      whereArgs: [normalizedName, categoryId, unitId, id],
+      limit: 1,
+    );
+    if (duplicate.isNotEmpty) {
+      throw const AppFailure('این جنس با همین دسته‌بندی و واحد ثبت شده است.');
     }
     await _database.update(
       'item',

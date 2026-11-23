@@ -61,7 +61,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('معلومات تازه شد؛ صفحه‌ها و شمارش‌ها را بازبینی کنید.'),
+      find.text('دیتا تازه شد؛ صفحه‌ها و شمارش‌ها را بازبینی کنید.'),
       findsOneWidget,
     );
     expect(find.text('۴ صفحه، ۱۵۱ مورد'), findsOneWidget);

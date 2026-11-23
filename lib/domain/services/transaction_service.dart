@@ -46,13 +46,13 @@ class TransactionService {
               date: _dateOnly(DateTime.now()),
               type: 'deposit',
               amountMinor: amountMinor,
-              note: 'موجودی آغازین',
+              note: 'موجودی',
             );
         await transaction.insert('wallet_activity', {
           'wallet_id': walletId,
           'event_type': 'deposit',
           'transaction_id': transactionId,
-          'details': 'موجودی آغازین',
+          'details': 'موجودی',
         });
       }
     });
@@ -120,20 +120,14 @@ class TransactionService {
     final suffix = limit == null ? '' : ' LIMIT $limit';
     return _database.rawQuery(
       '''
-      SELECT * FROM (
-        SELECT a.activity_id, a.wallet_id, a.event_type, a.occurred_at, a.details,
-          t.transaction_date, t.amount_minor, t.note
-        FROM wallet_activity a LEFT JOIN wallet_transaction t ON t.transaction_id = a.transaction_id
-        WHERE a.wallet_id = ?
-        UNION ALL
-        SELECT t.transaction_id, t.wallet_id, t.transaction_type, t.created_at,
-          t.note, t.transaction_date, t.amount_minor, t.note
-        FROM wallet_transaction t
-        WHERE t.wallet_id = ? AND t.transaction_type IN ('purchase', 'withdrawal', 'reversal')
-      ) activity
-      ORDER BY occurred_at DESC, activity_id DESC$suffix
-    ''',
-      [walletId, walletId],
+      SELECT a.activity_id, a.wallet_id, a.event_type, a.occurred_at, a.details,
+        t.transaction_date, t.amount_minor, t.note
+      FROM wallet_activity a
+      LEFT JOIN wallet_transaction t ON t.transaction_id = a.transaction_id
+      WHERE a.wallet_id = ?
+      ORDER BY a.occurred_at DESC, a.activity_id DESC$suffix
+      ''',
+      [walletId],
     );
   }
 

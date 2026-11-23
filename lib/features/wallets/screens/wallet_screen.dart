@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../app/hesab_services.dart';
 import '../../../core/finance/amount_codec.dart';
+import '../../../core/finance/grouped_amount_input_formatter.dart';
 import '../../../core/calendar/jalali_date.dart';
 import '../../../core/theme/hesab_theme.dart';
 import '../../../data/models/catalog_models.dart';
@@ -245,7 +246,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              const Icon(Icons.chevron_left),
+                              const Icon(Icons.chevron_right),
                             ],
                           ),
                           onTap: () => setState(() {
@@ -386,7 +387,7 @@ class _WalletScreenState extends State<WalletScreen> {
     final label = switch (type) {
       'created' => 'کیف پول ایجاد شد',
       'deposit' =>
-        (a['details'] == 'موجودی آغازین'
+        (a['details'] == 'موجودی'
             ? 'پول آغازین افزوده شد'
             : 'پول افزوده شد'),
       'updated' => 'کیف پول ویرایش شد',
@@ -547,13 +548,14 @@ class _WalletFormState extends State<_WalletForm> {
               if (!widget.amountRequired) const SizedBox(height: 10),
               TextField(
                 controller: _amount,
+                inputFormatters: const [GroupedAmountInputFormatter()],
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
                 decoration: InputDecoration(
                   labelText: widget.amountRequired
                       ? 'مبلغ *'
-                      : 'موجودی آغازین (اختیاری)',
+                      : 'موجودی (اختیاری)',
                   suffixText: '؋',
                   border: const OutlineInputBorder(),
                 ),
@@ -614,5 +616,5 @@ class _WalletFormState extends State<_WalletForm> {
       ),
     ],
   );
-  String _dateLabel(DateTime d) => '${d.year}/${d.month}/${d.day}';
+  String _dateLabel(DateTime d) => JalaliDate.fromGregorian(d).fullDate;
 }

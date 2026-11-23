@@ -54,7 +54,7 @@ class _HesabShellState extends State<HesabShell> {
   }
 
   static const _navigationItems = <_NavigationItem>[
-    _NavigationItem('پیشخوان', 'asset/icons/home.svg'),
+    _NavigationItem('داشبورد', 'asset/icons/home.svg'),
     _NavigationItem('مصارف', 'asset/icons/receipt.svg'),
     _NavigationItem('اجناس', 'asset/icons/items.svg'),
     _NavigationItem('کیف پول', 'asset/icons/wallet.svg'),

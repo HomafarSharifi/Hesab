@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../core/theme/hesab_theme.dart';
+import '../core/theme/theme_mode_store.dart';
 import '../data/database/hesab_database.dart';
 import 'hesab_services.dart';
 import 'hesab_app.dart';
@@ -15,12 +18,15 @@ class DatabaseBootstrap extends StatefulWidget {
 
 class _DatabaseBootstrapState extends State<DatabaseBootstrap> {
   Future<Database>? _database;
+  late Future<ThemeMode?> _themeModeFuture;
+  ThemeMode? _themeMode;
   int _databaseRevision = 0;
 
   @override
   void initState() {
     super.initState();
     _database = HesabDatabase.instance.database;
+    _themeModeFuture = const ThemeModeStore().load();
   }
 
   void _onDatabaseChanged() {
@@ -30,21 +36,49 @@ class _DatabaseBootstrapState extends State<DatabaseBootstrap> {
     });
   }
 
+  void _onThemeModeChanged(ThemeMode mode) {
+    setState(() => _themeMode = mode);
+    unawaited(_saveThemeMode(mode));
+  }
+
+  Future<void> _saveThemeMode(ThemeMode mode) async {
+    try {
+      await const ThemeModeStore().save(mode);
+    } on Object {
+      // Keep the current session usable if the preference cannot be written.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Database>(
-      future: _database,
+    return FutureBuilder<ThemeMode?>(
+      future: _themeModeFuture,
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const _DatabaseErrorApp();
+        if (snapshot.connectionState != ConnectionState.done &&
+            !snapshot.hasError) {
+          // Avoid showing a light splash while the saved theme is being read.
+          return const SizedBox.shrink();
         }
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const _DatabaseLoadingApp();
-        }
-        return HesabApp(
-          key: ValueKey(_databaseRevision),
-          services: HesabServices(snapshot.data!),
-          onDatabaseChanged: _onDatabaseChanged,
+        _themeMode ??= snapshot.hasError
+            ? ThemeMode.system
+            : snapshot.data ?? ThemeMode.system;
+        return FutureBuilder<Database>(
+          future: _database,
+          builder: (context, databaseSnapshot) {
+            if (databaseSnapshot.hasError) {
+              return _DatabaseErrorApp(themeMode: _themeMode!);
+            }
+            if (databaseSnapshot.connectionState != ConnectionState.done) {
+              return _DatabaseLoadingApp(themeMode: _themeMode!);
+            }
+            return HesabApp(
+              key: ValueKey(_databaseRevision),
+              services: HesabServices(databaseSnapshot.data!),
+              onDatabaseChanged: _onDatabaseChanged,
+              themeMode: _themeMode!,
+              onThemeModeChanged: _onThemeModeChanged,
+            );
+          },
         );
       },
     );
@@ -52,7 +86,9 @@ class _DatabaseBootstrapState extends State<DatabaseBootstrap> {
 }
 
 class _DatabaseLoadingApp extends StatelessWidget {
-  const _DatabaseLoadingApp();
+  const _DatabaseLoadingApp({required this.themeMode});
+
+  final ThemeMode themeMode;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -60,6 +96,8 @@ class _DatabaseLoadingApp extends StatelessWidget {
     locale: const Locale('fa', 'AF'),
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     theme: HesabTheme.light,
+    darkTheme: HesabTheme.dark,
+    themeMode: themeMode,
     home: const Scaffold(
       body: Center(
         child: Column(
@@ -67,7 +105,7 @@ class _DatabaseLoadingApp extends StatelessWidget {
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 18),
-            Text('پایگاه معلوماتی آماده می‌شود…'),
+            Text('دیتابیس آماده می‌شود…'),
           ],
         ),
       ),
@@ -76,7 +114,9 @@ class _DatabaseLoadingApp extends StatelessWidget {
 }
 
 class _DatabaseErrorApp extends StatelessWidget {
-  const _DatabaseErrorApp();
+  const _DatabaseErrorApp({required this.themeMode});
+
+  final ThemeMode themeMode;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -84,6 +124,8 @@ class _DatabaseErrorApp extends StatelessWidget {
     locale: const Locale('fa', 'AF'),
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     theme: HesabTheme.light,
+    darkTheme: HesabTheme.dark,
+    themeMode: themeMode,
     home: Scaffold(
       body: Center(
         child: Padding(
@@ -94,12 +136,12 @@ class _DatabaseErrorApp extends StatelessWidget {
               const Icon(Icons.storage_rounded, size: 48),
               const SizedBox(height: 16),
               Text(
-                'پایگاه معلوماتی باز نشد.',
+                'دیتابیس باز نشد.',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               const Text(
-                'دسترسی به پایگاه معلوماتی ممکن نشد. دوباره تلاش کنید.',
+                'دسترسی به دیتابیس ممکن نشد. دوباره تلاش کنید.',
               ),
               const SizedBox(height: 20),
               FilledButton(

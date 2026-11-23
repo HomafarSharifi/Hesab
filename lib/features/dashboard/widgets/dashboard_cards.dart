@@ -28,47 +28,27 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final primary = colors.primary;
-    final primaryDark = Color.lerp(primary, Colors.black, .52)!;
-    final accent = colors.tertiary;
+    final foreground = colors.onSurface;
+    final mutedForeground = colors.onSurfaceVariant;
+    final surface = HesabTheme.summarySurface(context);
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [
-            primary,
-            primaryDark,
-            Color.lerp(primaryDark, Colors.black, .24)!,
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: primary.withValues(alpha: .22),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        color: surface,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: Stack(
           children: [
-            Positioned(
-              left: -45,
-              top: -45,
-              child: _WalletOrb(
-                size: 170,
-                color: Colors.white.withValues(alpha: .06),
-              ),
-            ),
-            Positioned(
-              left: 25,
-              bottom: -70,
-              child: _WalletOrb(
-                size: 180,
-                color: accent.withValues(alpha: .09),
+            PositionedDirectional(
+              start: -12,
+              bottom: -18,
+              child: IgnorePointer(
+                child: Icon(
+                  Icons.account_balance_wallet_rounded,
+                  size: 150,
+                  color: colors.primary.withValues(alpha: .055),
+                ),
               ),
             ),
             Padding(
@@ -88,18 +68,22 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                             vertical: 7,
                           ),
                           decoration: BoxDecoration(
-                            color: accent,
+                            color: colors.primary,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.add_rounded, size: 15, color: colors.onTertiary),
+                              Icon(
+                                Icons.add_rounded,
+                                size: 15,
+                                color: colors.onPrimary,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 'وارد کردن پول',
                                 style: TextStyle(
-                                  color: colors.onTertiary,
+                                  color: colors.onPrimary,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -112,10 +96,10 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'کیف پول',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: foreground,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -123,7 +107,7 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                           Text(
                             'شریفی',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: .72),
+                              color: mutedForeground,
                               fontSize: 10,
                             ),
                           ),
@@ -133,12 +117,12 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                       Container(
                         padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: .14),
+                          color: colors.primary.withValues(alpha: .1),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.account_balance_wallet_rounded,
-                          color: Colors.white,
+                          color: colors.primary,
                           size: 18,
                         ),
                       ),
@@ -148,7 +132,7 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                   Text(
                     'موجودی باقی‌مانده',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: .78),
+                      color: mutedForeground,
                       fontSize: 11,
                     ),
                   ),
@@ -165,8 +149,8 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                                 : AmountCodec.formatMoneyMinor(
                                     widget.balanceMinor ?? 0,
                                   ),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: foreground,
                               fontSize: 34,
                               fontWeight: FontWeight.w900,
                               height: 1.1,
@@ -182,7 +166,7 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: .14),
+                            color: colors.primary.withValues(alpha: .1),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -190,7 +174,7 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                                 ? Icons.visibility_off_rounded
                                 : Icons.visibility_rounded,
                             size: 16,
-                            color: Colors.white.withValues(alpha: .9),
+                            color: colors.primary,
                           ),
                         ),
                       ),
@@ -206,7 +190,7 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                           title: 'دریافتی',
                           amountMinor: widget.receivedMinor,
                           hideAmount: _hideBalance,
-                          iconColor: accent,
+                          iconColor: colors.primary,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -216,7 +200,7 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                           title: 'مصرف شده',
                           amountMinor: widget.spentMinor,
                           hideAmount: _hideBalance,
-                          iconColor: accent,
+                          iconColor: colors.primary,
                         ),
                       ),
                     ],
@@ -229,19 +213,6 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
       ),
     );
   }
-}
-
-class _WalletOrb extends StatelessWidget {
-  const _WalletOrb({required this.size, required this.color});
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-  );
 }
 
 class _WalletMiniSummary extends StatelessWidget {
@@ -261,11 +232,12 @@ class _WalletMiniSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .12),
-        border: Border.all(color: Colors.white.withValues(alpha: .14)),
+        color: colors.surface.withValues(alpha: .72),
+        border: Border.all(color: colors.outlineVariant),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -274,7 +246,7 @@ class _WalletMiniSummary extends StatelessWidget {
             width: 25,
             height: 25,
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: .2),
+              color: iconColor.withValues(alpha: .1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, size: 14, color: iconColor),
@@ -288,7 +260,7 @@ class _WalletMiniSummary extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: .75),
+                    color: colors.onSurfaceVariant,
                     fontSize: 9,
                   ),
                 ),
@@ -301,8 +273,8 @@ class _WalletMiniSummary extends StatelessWidget {
                         : (amountMinor == null
                               ? '—'
                               : AmountCodec.formatMoneyMinor(amountMinor!)),
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: colors.onSurface,
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
                     ),

@@ -90,7 +90,7 @@ class _ExpenseExportDialogState extends State<ExpenseExportDialog> {
           _totalCount = latestCount;
           _selectedPageIndexes.removeWhere((page) => page >= _pageCount);
           _checkingSnapshot = false;
-          _message = 'معلومات تازه شد؛ صفحه‌ها و شمارش‌ها را بازبینی کنید.';
+          _message = 'دیتا تازه شد؛ صفحه‌ها و شمارش‌ها را بازبینی کنید.';
         });
         return;
       }
@@ -113,7 +113,7 @@ class _ExpenseExportDialogState extends State<ExpenseExportDialog> {
       if (!mounted) return;
       setState(() {
         _checkingSnapshot = false;
-        _message = 'شمارش معلومات تازه نشد. دوباره تلاش کنید.';
+        _message = 'شمارش دیتا تازه نشد. دوباره تلاش کنید.';
       });
     }
   }
