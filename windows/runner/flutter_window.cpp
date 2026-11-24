@@ -1,20 +1,9 @@
 #include "flutter_window.h"
 
-#include <dwmapi.h>
-
-#include <cstdint>
+#include <map>
 #include <optional>
+#include <string>
 #include <variant>
-
-#ifndef DWMWA_CAPTION_COLOR
-#define DWMWA_CAPTION_COLOR 35
-#endif
-#ifndef DWMWA_BORDER_COLOR
-#define DWMWA_BORDER_COLOR 34
-#endif
-#ifndef DWMWA_TEXT_COLOR
-#define DWMWA_TEXT_COLOR 36
-#endif
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -48,51 +37,50 @@ bool FlutterWindow::OnCreate() {
       [this](const flutter::MethodCall<flutter::EncodableValue>& call,
              std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
                  result) {
-        if (call.method_name() != "setCaptionColors") {
-          result->NotImplemented();
+        if (call.method_name() == "minimize") {
+          Minimize();
+          result->Success();
           return;
         }
-
-        const auto* arguments =
-            std::get_if<flutter::EncodableMap>(call.arguments());
-        if (arguments == nullptr) {
-          result->Error("invalid_arguments", "Expected caption color map");
+        if (call.method_name() == "toggleMaximize") {
+          result->Success(flutter::EncodableValue(ToggleMaximize()));
           return;
         }
-
-        const auto background =
-            arguments->find(flutter::EncodableValue("background"));
-        const auto foreground =
-            arguments->find(flutter::EncodableValue("foreground"));
-        if (background == arguments->end() || foreground == arguments->end()) {
-          result->Error("invalid_arguments", "Caption colors are required");
+        if (call.method_name() == "isMaximized") {
+          result->Success(flutter::EncodableValue(IsWindowMaximized()));
           return;
         }
-
-        const auto* background_argb =
-            std::get_if<int64_t>(&background->second);
-        const auto* foreground_argb =
-            std::get_if<int64_t>(&foreground->second);
-        if (background_argb == nullptr || foreground_argb == nullptr) {
-          result->Error("invalid_arguments", "Caption colors must be integers");
+        if (call.method_name() == "close") {
+          result->Success();
+          Close();
           return;
         }
-
-        const auto to_color_ref = [](int64_t argb) {
-          const auto color = static_cast<uint32_t>(argb);
-          return RGB((color >> 16) & 0xFF, (color >> 8) & 0xFF,
-                     color & 0xFF);
-        };
-        const COLORREF caption_color = to_color_ref(*background_argb);
-        const COLORREF caption_text_color = to_color_ref(*foreground_argb);
-        DwmSetWindowAttribute(GetHandle(), DWMWA_BORDER_COLOR, &caption_color,
-                              sizeof(caption_color));
-        DwmSetWindowAttribute(GetHandle(), DWMWA_CAPTION_COLOR, &caption_color,
-                              sizeof(caption_color));
-        DwmSetWindowAttribute(GetHandle(), DWMWA_TEXT_COLOR,
-                              &caption_text_color,
-                              sizeof(caption_text_color));
-        result->Success();
+        if (call.method_name() == "startDragging") {
+          StartDragging();
+          result->Success();
+          return;
+        }
+        if (call.method_name() == "startResizing") {
+          const auto* edge = std::get_if<std::string>(call.arguments());
+          if (edge == nullptr) {
+            result->Error("invalid_arguments", "Expected a resize edge");
+            return;
+          }
+          const std::map<std::string, WPARAM> resize_edges = {
+              {"top", HTTOP}, {"bottom", HTBOTTOM},
+              {"left", HTLEFT}, {"right", HTRIGHT},
+              {"topLeft", HTTOPLEFT}, {"topRight", HTTOPRIGHT},
+              {"bottomLeft", HTBOTTOMLEFT}, {"bottomRight", HTBOTTOMRIGHT}};
+          const auto hit = resize_edges.find(*edge);
+          if (hit == resize_edges.end()) {
+            result->Error("invalid_arguments", "Unknown resize edge");
+            return;
+          }
+          StartResizing(hit->second);
+          result->Success();
+          return;
+        }
+        result->NotImplemented();
       });
 
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
@@ -125,6 +113,41 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // Frameless move/resize and maximize-button clicks use the native
+  // non-client path so Windows can handle the window action and Snap Layouts.
+  if (message == WM_NCLBUTTONDOWN && wparam != HTMAXBUTTON) {
+    return DefWindowProc(hwnd, message, wparam, lparam);
+  }
+
+  if (message == WM_NCLBUTTONDOWN || message == WM_NCLBUTTONUP ||
+      (message == WM_NCMOUSEMOVE && wparam == HTMAXBUTTON) ||
+      message == WM_NCMOUSELEAVE ||
+      (message == WM_LBUTTONUP && IsMaximizeButtonPressed()) ||
+      message == WM_CAPTURECHANGED ||
+      (message == WM_CANCELMODE && IsMaximizeButtonPressed())) {
+    return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+  }
+
+  // Native non-client hit testing must take precedence so Flutter never turns
+  // resize borders into client input. All other messages remain Flutter-first.
+  if (message == WM_NCCALCSIZE || message == WM_NCHITTEST ||
+      message == WM_GETMINMAXINFO) {
+    return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+  }
+
+  if (message == WM_SIZE && window_channel_ &&
+      (wparam == SIZE_MAXIMIZED || wparam == SIZE_RESTORED ||
+       wparam == SIZE_MINIMIZED)) {
+    const bool maximized = IsWindowMaximized();
+    if (!last_reported_maximized_.has_value() ||
+        *last_reported_maximized_ != maximized) {
+      last_reported_maximized_ = maximized;
+      window_channel_->InvokeMethod(
+          "windowStateChanged",
+          std::make_unique<flutter::EncodableValue>(maximized));
+    }
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

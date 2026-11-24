@@ -1,8 +1,4 @@
-import 'dart:async';
-
-import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/services.dart';
 
 import '../core/theme/hesab_theme.dart';
 import 'hesab_services.dart';
@@ -27,11 +23,6 @@ class HesabApp extends StatefulWidget {
 }
 
 class _HesabAppState extends State<HesabApp> {
-  static const _windowChannel = MethodChannel('hesab/window');
-
-  int? _lastCaptionBackground;
-  int? _lastCaptionForeground;
-
   void _toggleTheme(bool isDarkMode) {
     final mode = isDarkMode ? ThemeMode.light : ThemeMode.dark;
     widget.onThemeModeChanged(mode);
@@ -49,23 +40,6 @@ class _HesabAppState extends State<HesabApp> {
       darkTheme: HesabTheme.dark,
       themeMode: widget.themeMode,
       builder: (context, child) {
-        final colors = Theme.of(context).colorScheme;
-        final captionBackground = colors.primary.toARGB32();
-        final captionForeground = colors.onPrimary.toARGB32();
-        if (defaultTargetPlatform == TargetPlatform.windows &&
-            (_lastCaptionBackground != captionBackground ||
-                _lastCaptionForeground != captionForeground)) {
-          _lastCaptionBackground = captionBackground;
-          _lastCaptionForeground = captionForeground;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            unawaited(
-              _windowChannel.invokeMethod<void>('setCaptionColors', {
-                'background': captionBackground,
-                'foreground': captionForeground,
-              }),
-            );
-          });
-        }
         return Directionality(
           textDirection: TextDirection.rtl,
           child: child ?? const SizedBox.shrink(),

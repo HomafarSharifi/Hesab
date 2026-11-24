@@ -49,6 +49,13 @@ class Win32Window {
   // window properties. Returns nullptr if the window has been destroyed.
   HWND GetHandle();
 
+  bool IsWindowMaximized() const;
+  void Minimize();
+  bool ToggleMaximize();
+  void Close();
+  void StartDragging();
+  void StartResizing(WPARAM hit);
+
   // If true, closing this window will quit the application.
   void SetQuitOnClose(bool quit_on_close);
 
@@ -63,6 +70,8 @@ class Win32Window {
                                  UINT const message,
                                  WPARAM const wparam,
                                  LPARAM const lparam) noexcept;
+
+  bool IsMaximizeButtonPressed() const;
 
   // Called when CreateAndShow is called, allowing subclass window-related
   // setup. Subclasses should return false if setup fails.
@@ -84,6 +93,19 @@ class Win32Window {
                                   WPARAM const wparam,
                                   LPARAM const lparam) noexcept;
 
+  static LRESULT CALLBACK ChildContentSubclassProc(
+      HWND const window, UINT const message, WPARAM const wparam,
+      LPARAM const lparam, UINT_PTR const subclass_id,
+      DWORD_PTR const reference_data) noexcept;
+
+  LRESULT HandleChildContentMessage(HWND const window, UINT const message,
+                                   WPARAM const wparam,
+                                   LPARAM const lparam) noexcept;
+  bool IsMaximizeButtonHit(HWND const window, LPARAM const lparam) const;
+  void CompleteMaximizeButtonClick(HWND const window, POINT screen_point);
+  void ForwardNonClientMouseMove(HWND const window, LPARAM const lparam,
+                                 WPARAM const button_state);
+
   // Retrieves a class instance pointer for |window|
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;
 
@@ -91,6 +113,7 @@ class Win32Window {
   static void UpdateTheme(HWND const window);
 
   bool quit_on_close_ = false;
+  bool maximize_button_pressed_ = false;
 
   // window handle for top level window.
   HWND window_handle_ = nullptr;

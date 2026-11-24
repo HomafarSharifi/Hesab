@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/calendar/jalali_date.dart';
@@ -11,6 +12,8 @@ import '../features/wallets/screens/wallet_screen.dart';
 import '../features/reports/screens/reports_screen.dart';
 import '../features/settings/screens/settings_screen.dart';
 import '../features/shared/widgets/app_page_header.dart';
+import '../features/shared/widgets/app_window_controls.dart';
+import '../features/shared/widgets/app_window_resize_handles.dart';
 import '../features/shared/widgets/jalali_date_range_dialog.dart';
 import 'hesab_services.dart';
 
@@ -110,31 +113,46 @@ class _HesabShellState extends State<HesabShell> {
             final headerHorizontalPadding = (contentWidth * 0.045)
                 .clamp(18.0, 64.0)
                 .toDouble();
+            final hasWindowControls =
+                defaultTargetPlatform == TargetPlatform.windows;
             return Directionality(
               textDirection: TextDirection.ltr,
-              child: Row(
+              child: Stack(
                 children: [
-                  Expanded(
-                    child: _buildContent(context, headerHorizontalPadding),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildContent(context, headerHorizontalPadding),
+                      ),
+                      SizedBox(
+                        width: sidebarWidth,
+                        child: Padding(
+                          padding: EdgeInsetsDirectional.fromSTEB(
+                            0,
+                            collapsedSidebar ? 8 : 18,
+                            collapsedSidebar ? 8 : 18,
+                            collapsedSidebar ? 8 : 18,
+                          ),
+                          child: _Sidebar(
+                            selectedIndex: _selectedIndex,
+                            items: _navigationItems,
+                            onSelect: _selectPage,
+                            onNewExpense: _startNewExpense,
+                            iconOnly: collapsedSidebar,
+                            reserveWindowControls: hasWindowControls,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(
-                    width: sidebarWidth,
-                    child: Padding(
-                      padding: EdgeInsetsDirectional.fromSTEB(
-                        0,
-                        collapsedSidebar ? 8 : 18,
-                        collapsedSidebar ? 8 : 18,
-                        collapsedSidebar ? 8 : 18,
-                      ),
-                      child: _Sidebar(
-                        selectedIndex: _selectedIndex,
-                        items: _navigationItems,
-                        onSelect: _selectPage,
-                        onNewExpense: _startNewExpense,
-                        iconOnly: collapsedSidebar,
-                      ),
+                  if (hasWindowControls)
+                    const Positioned.fill(child: AppWindowResizeHandles()),
+                  if (hasWindowControls)
+                    const Positioned(
+                      top: 0,
+                      right: 0,
+                      child: AppWindowControls(),
                     ),
-                  ),
                 ],
               ),
             );
@@ -213,6 +231,7 @@ class _Sidebar extends StatelessWidget {
     required this.onSelect,
     required this.onNewExpense,
     required this.iconOnly,
+    required this.reserveWindowControls,
   });
 
   final int selectedIndex;
@@ -220,6 +239,7 @@ class _Sidebar extends StatelessWidget {
   final ValueChanged<int> onSelect;
   final VoidCallback onNewExpense;
   final bool iconOnly;
+  final bool reserveWindowControls;
 
   @override
   Widget build(BuildContext context) {
@@ -238,8 +258,18 @@ class _Sidebar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(22),
                 ),
                 padding: compact
-                    ? const EdgeInsetsDirectional.fromSTEB(16, 14, 16, 14)
-                    : const EdgeInsetsDirectional.fromSTEB(16, 18, 16, 16),
+                    ? EdgeInsetsDirectional.fromSTEB(
+                        16,
+                        reserveWindowControls ? 48 : 14,
+                        16,
+                        14,
+                      )
+                    : EdgeInsetsDirectional.fromSTEB(
+                        16,
+                        reserveWindowControls ? 48 : 18,
+                        16,
+                        16,
+                      ),
                 child: Column(
                   children: [
                     if (!iconOnly) _HesabMark(compact: compact),

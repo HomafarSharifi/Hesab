@@ -7,6 +7,7 @@
 #include <flutter/standard_method_codec.h>
 
 #include <memory>
+#include <optional>
 
 #include "win32_window.h"
 
@@ -34,6 +35,8 @@ class FlutterWindow : public Win32Window {
   // Keeps the native title bar synchronized with the active Flutter theme.
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       window_channel_;
+
+  std::optional<bool> last_reported_maximized_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

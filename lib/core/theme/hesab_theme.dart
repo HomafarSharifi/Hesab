@@ -114,6 +114,7 @@ abstract final class HesabTheme {
             : Colors.white,
         surfaceTintColor: Colors.transparent,
       ),
+      tooltipTheme: const TooltipThemeData(waitDuration: Duration(seconds: 1)),
       dividerColor: brightness == Brightness.dark
           ? const Color(0xFF343C39)
           : const Color(0xFFD4DBD8),

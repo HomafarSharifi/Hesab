@@ -1,7 +1,11 @@
 #include "win32_window.h"
 
+#include <commctrl.h>
 #include <dwmapi.h>
 #include <flutter_windows.h>
+#include <windowsx.h>
+
+#include <algorithm>
 
 #include "resource.h"
 
@@ -139,8 +143,13 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
+  // WS_POPUP prevents DWM from recreating a caption on this runner. Retain the
+  // thick frame and system window buttons so resizing and maximize semantics
+  // continue to work; WM_NCCALCSIZE makes the Flutter client area edge-to-edge.
+  constexpr DWORD kFramelessWindowStyle =
+      WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU;
   HWND window = CreateWindow(
-      window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
+      window_class, title.c_str(), kFramelessWindowStyle,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
       Scale(size.width, scale_factor), Scale(size.height, scale_factor),
       nullptr, nullptr, GetModuleHandle(nullptr), this);
@@ -150,6 +159,9 @@ bool Win32Window::Create(const std::wstring& title,
   }
 
   UpdateTheme(window);
+  const DWM_WINDOW_CORNER_PREFERENCE corner_preference = DWMWCP_ROUND;
+  DwmSetWindowAttribute(window, DWMWA_WINDOW_CORNER_PREFERENCE,
+                        &corner_preference, sizeof(corner_preference));
 
   return OnCreate();
 }
@@ -178,18 +190,216 @@ LRESULT CALLBACK Win32Window::WndProc(HWND const window,
   return DefWindowProc(window, message, wparam, lparam);
 }
 
+LRESULT CALLBACK Win32Window::ChildContentSubclassProc(
+    HWND const window, UINT const message, WPARAM const wparam,
+    LPARAM const lparam, UINT_PTR const subclass_id,
+    DWORD_PTR const reference_data) noexcept {
+  auto* that = reinterpret_cast<Win32Window*>(reference_data);
+  if (that == nullptr) {
+    return DefSubclassProc(window, message, wparam, lparam);
+  }
+  return that->HandleChildContentMessage(window, message, wparam, lparam);
+}
+
+LRESULT Win32Window::HandleChildContentMessage(HWND const window,
+                                               UINT const message,
+                                               WPARAM const wparam,
+                                               LPARAM const lparam) noexcept {
+  switch (message) {
+    case WM_NCHITTEST:
+      if (IsMaximizeButtonHit(window, lparam)) return HTMAXBUTTON;
+      break;
+
+    case WM_NCMOUSEMOVE:
+      if (wparam == HTMAXBUTTON) {
+        TRACKMOUSEEVENT tracking{sizeof(TRACKMOUSEEVENT),
+                                TME_LEAVE | TME_NONCLIENT, window, 0};
+        TrackMouseEvent(&tracking);
+        ForwardNonClientMouseMove(window, lparam, 0);
+        return 0;
+      }
+      break;
+
+    case WM_NCMOUSELEAVE: {
+      POINT point{};
+      if (GetCursorPos(&point)) {
+        MapWindowPoints(nullptr, window, &point, 1);
+        DefSubclassProc(window, WM_MOUSEMOVE, 0,
+                        MAKELPARAM(point.x, point.y));
+      }
+      return 0;
+    }
+
+    case WM_NCLBUTTONDOWN:
+      if (wparam == HTMAXBUTTON) {
+        const HWND root = GetAncestor(window, GA_ROOT);
+        if (root != nullptr) {
+          return SendMessage(root, message, wparam, lparam);
+        }
+      }
+      break;
+
+    case WM_NCLBUTTONUP:
+      if (wparam == HTMAXBUTTON) {
+        const HWND root = GetAncestor(window, GA_ROOT);
+        if (root != nullptr) {
+          return SendMessage(root, message, wparam, lparam);
+        }
+      }
+      break;
+  }
+  return DefSubclassProc(window, message, wparam, lparam);
+}
+
+bool Win32Window::IsMaximizeButtonHit(HWND const window,
+                                      LPARAM const lparam) const {
+  POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+  MapWindowPoints(nullptr, window, &point, 1);
+
+  RECT client{};
+  if (!GetClientRect(window, &client)) return false;
+
+  // Keep these dimensions aligned with the 34 logical-pixel Flutter controls.
+  const int button_size = MulDiv(34, GetDpiForWindow(window), 96);
+  const RECT maximize_button = {client.right - button_size * 2, 0,
+                                client.right - button_size, button_size};
+  return PtInRect(&maximize_button, point) != FALSE;
+}
+
+void Win32Window::CompleteMaximizeButtonClick(HWND const window,
+                                             POINT screen_point) {
+  const bool released_on_button = IsMaximizeButtonHit(
+      window, MAKELPARAM(screen_point.x, screen_point.y));
+  maximize_button_pressed_ = false;
+  if (GetCapture() == window) ReleaseCapture();
+  if (released_on_button) ToggleMaximize();
+}
+
+bool Win32Window::IsMaximizeButtonPressed() const {
+  return maximize_button_pressed_;
+}
+
+void Win32Window::ForwardNonClientMouseMove(HWND const window,
+                                            LPARAM const lparam,
+                                            WPARAM const button_state) {
+  POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+  MapWindowPoints(nullptr, window, &point, 1);
+  DefSubclassProc(window, WM_MOUSEMOVE, button_state,
+                  MAKELPARAM(point.x, point.y));
+}
+
 LRESULT
 Win32Window::MessageHandler(HWND hwnd,
                             UINT const message,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_NCLBUTTONDOWN:
+      if (wparam == HTMAXBUTTON) {
+        maximize_button_pressed_ = true;
+        SetCapture(hwnd);
+        if (GetCapture() == hwnd) return 0;
+        maximize_button_pressed_ = false;
+      }
+      break;
+
+    case WM_NCLBUTTONUP:
+      if (maximize_button_pressed_) {
+        POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+        CompleteMaximizeButtonClick(hwnd, point);
+        return 0;
+      }
+      break;
+
+    case WM_LBUTTONUP:
+      if (maximize_button_pressed_) {
+        POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+        ClientToScreen(hwnd, &point);
+        CompleteMaximizeButtonClick(hwnd, point);
+        return 0;
+      }
+      break;
+
+    case WM_CAPTURECHANGED:
+    case WM_CANCELMODE:
+      maximize_button_pressed_ = false;
+      break;
+
+    case WM_NCMOUSEMOVE:
+      if (wparam == HTMAXBUTTON && child_content_ != nullptr) {
+        TRACKMOUSEEVENT tracking{sizeof(TRACKMOUSEEVENT),
+                                TME_LEAVE | TME_NONCLIENT, hwnd, 0};
+        TrackMouseEvent(&tracking);
+        POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+        MapWindowPoints(nullptr, child_content_, &point, 1);
+        SendMessage(child_content_, WM_MOUSEMOVE, 0,
+                    MAKELPARAM(point.x, point.y));
+        return 0;
+      }
+      break;
+
+    case WM_NCMOUSELEAVE: {
+      POINT point{};
+      if (child_content_ != nullptr && GetCursorPos(&point)) {
+        MapWindowPoints(nullptr, child_content_, &point, 1);
+        SendMessage(child_content_, WM_MOUSEMOVE, 0,
+                    MAKELPARAM(point.x, point.y));
+        return 0;
+      }
+      break;
+    }
+
+    case WM_NCCALCSIZE:
+      // Remove the non-client title bar and border while retaining the
+      // thick-frame style for native resize gestures and snap layouts.
+      if (wparam != 0) {
+        return 0;
+      }
+      break;
+
+    case WM_NCHITTEST: {
+      if (IsMaximizeButtonHit(hwnd, lparam)) return HTMAXBUTTON;
+      // Compute resize zones directly from the physical window bounds. The
+      // default hit test can report client hits for a popup-style frameless
+      // window even where the thick-frame resize cursor is expected.
+      if (IsZoomed(hwnd)) return HTCLIENT;
+      POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+      RECT bounds{};
+      if (!GetWindowRect(hwnd, &bounds)) return HTCLIENT;
+      const int edge = std::max(1, MulDiv(10, GetDpiForWindow(hwnd), 96));
+      const bool left = point.x < bounds.left + edge;
+      const bool right = point.x >= bounds.right - edge;
+      const bool top = point.y < bounds.top + edge;
+      const bool bottom = point.y >= bounds.bottom - edge;
+      if (top && left) return HTTOPLEFT;
+      if (top && right) return HTTOPRIGHT;
+      if (bottom && left) return HTBOTTOMLEFT;
+      if (bottom && right) return HTBOTTOMRIGHT;
+      if (left) return HTLEFT;
+      if (right) return HTRIGHT;
+      if (top) return HTTOP;
+      if (bottom) return HTBOTTOM;
+      return HTCLIENT;
+    }
+
     case WM_GETMINMAXINFO: {
       auto info = reinterpret_cast<MINMAXINFO*>(lparam);
       const UINT dpi = GetDpiForWindow(hwnd);
       const double scale_factor = dpi / 96.0;
       info->ptMinTrackSize.x = Scale(kMinimumWindowWidth, scale_factor);
       info->ptMinTrackSize.y = Scale(kMinimumWindowHeight, scale_factor);
+      MONITORINFO monitor_info{sizeof(MONITORINFO)};
+      if (GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST),
+                         &monitor_info)) {
+        info->ptMaxPosition.x = monitor_info.rcWork.left -
+                                monitor_info.rcMonitor.left;
+        info->ptMaxPosition.y = monitor_info.rcWork.top -
+                                monitor_info.rcMonitor.top;
+        info->ptMaxSize.x = monitor_info.rcWork.right -
+                            monitor_info.rcWork.left;
+        info->ptMaxSize.y = monitor_info.rcWork.bottom -
+                            monitor_info.rcWork.top;
+      }
       return 0;
     }
     case WM_DESTROY:
@@ -235,6 +445,12 @@ Win32Window::MessageHandler(HWND hwnd,
 }
 
 void Win32Window::Destroy() {
+  if (child_content_ != nullptr) {
+    RemoveWindowSubclass(child_content_, ChildContentSubclassProc,
+                         reinterpret_cast<UINT_PTR>(this));
+    child_content_ = nullptr;
+  }
+
   OnDestroy();
 
   if (window_handle_) {
@@ -254,6 +470,9 @@ Win32Window* Win32Window::GetThisFromHandle(HWND const window) noexcept {
 void Win32Window::SetChildContent(HWND content) {
   child_content_ = content;
   SetParent(content, window_handle_);
+  SetWindowSubclass(content, ChildContentSubclassProc,
+                    reinterpret_cast<UINT_PTR>(this),
+                    reinterpret_cast<DWORD_PTR>(this));
   RECT frame = GetClientArea();
 
   MoveWindow(content, frame.left, frame.top, frame.right - frame.left,
@@ -270,6 +489,42 @@ RECT Win32Window::GetClientArea() {
 
 HWND Win32Window::GetHandle() {
   return window_handle_;
+}
+
+bool Win32Window::IsWindowMaximized() const {
+  return window_handle_ != nullptr && IsZoomed(window_handle_);
+}
+
+void Win32Window::Minimize() {
+  if (window_handle_ != nullptr) ShowWindow(window_handle_, SW_MINIMIZE);
+}
+
+bool Win32Window::ToggleMaximize() {
+  if (window_handle_ == nullptr) return false;
+  ShowWindow(window_handle_, IsZoomed(window_handle_) ? SW_RESTORE : SW_MAXIMIZE);
+  return IsZoomed(window_handle_);
+}
+
+void Win32Window::Close() {
+  if (window_handle_ != nullptr) PostMessage(window_handle_, WM_CLOSE, 0, 0);
+}
+
+void Win32Window::StartDragging() {
+  if (window_handle_ == nullptr) return;
+  POINT cursor{};
+  if (!GetCursorPos(&cursor)) return;
+  ReleaseCapture();
+  SendMessage(window_handle_, WM_NCLBUTTONDOWN, HTCAPTION,
+              MAKELPARAM(cursor.x, cursor.y));
+}
+
+void Win32Window::StartResizing(WPARAM hit) {
+  if (window_handle_ == nullptr || IsZoomed(window_handle_)) return;
+  POINT cursor{};
+  if (!GetCursorPos(&cursor)) return;
+  ReleaseCapture();
+  SendMessage(window_handle_, WM_NCLBUTTONDOWN, hit,
+              MAKELPARAM(cursor.x, cursor.y));
 }
 
 void Win32Window::SetQuitOnClose(bool quit_on_close) {

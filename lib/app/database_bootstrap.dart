@@ -98,15 +98,25 @@ class _DatabaseLoadingApp extends StatelessWidget {
     theme: HesabTheme.light,
     darkTheme: HesabTheme.dark,
     themeMode: themeMode,
-    home: const Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 18),
-            Text('دیتابیس آماده می‌شود…'),
-          ],
+    home: Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.sizeOf(context).height,
+            ),
+            child: const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 18),
+                  Text('دیتابیس آماده می‌شود…'),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     ),
@@ -127,28 +137,33 @@ class _DatabaseErrorApp extends StatelessWidget {
     darkTheme: HesabTheme.dark,
     themeMode: themeMode,
     home: Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.storage_rounded, size: 48),
-              const SizedBox(height: 16),
-              Text(
-                'دیتابیس باز نشد.',
-                style: Theme.of(context).textTheme.titleLarge,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.sizeOf(context).height,
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.storage_rounded, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    'دیتابیس باز نشد.',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('دسترسی به دیتابیس ممکن نشد. دوباره تلاش کنید.'),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: _retry,
+                    child: const Text('دوباره تلاش کنید'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'دسترسی به دیتابیس ممکن نشد. دوباره تلاش کنید.',
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: _retry,
-                child: const Text('دوباره تلاش کنید'),
-              ),
-            ],
+            ),
           ),
         ),
       ),
