@@ -10,6 +10,8 @@ import '../widgets/dashboard_charts.dart';
 import '../../shared/widgets/app_empty_state.dart';
 
 class DashboardScreen extends StatefulWidget {
+  static const pageInset = 10.0;
+
   const DashboardScreen({
     required this.services,
     required this.onAddFunds,
@@ -88,8 +90,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
-        final stageWidth = math.max(constraints.maxWidth, 1040.0);
-        final stageHeight = math.max(constraints.maxHeight, 560.0);
+        const minimumStageWidth = 1040.0;
+        const minimumStageHeight = 560.0;
+        final stageWidth = math.max(constraints.maxWidth, minimumStageWidth);
+        final widthScale = (constraints.maxWidth / stageWidth)
+            .clamp(0.0, 1.0)
+            .toDouble();
+        final stageHeight = math.max(
+          minimumStageHeight,
+          widthScale > 0
+              ? constraints.maxHeight / widthScale
+              : minimumStageHeight,
+        );
 
         return Directionality(
           textDirection: TextDirection.rtl,
@@ -101,7 +113,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 width: stageWidth,
                 height: stageHeight,
                 child: Padding(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(DashboardScreen.pageInset),
                   child: Column(
                     children: [
                       Expanded(

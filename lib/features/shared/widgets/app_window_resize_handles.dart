@@ -5,7 +5,7 @@ class AppWindowResizeHandles extends StatelessWidget {
   const AppWindowResizeHandles({super.key});
 
   static const _channel = MethodChannel('hesab/window');
-  static const _edgeSize = 24.0;
+  static const _edgeSize = 7.0;
 
   Future<void> _startResize(String edge) async {
     try {

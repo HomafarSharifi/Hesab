@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/hesab_theme.dart';
 
 class AppPageHeader extends StatelessWidget {
+  static const stackedBreakpoint = 420.0;
+
   const AppPageHeader({
     required this.title,
     required this.selectedPeriod,
@@ -25,7 +27,7 @@ class AppPageHeader extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 900;
-        final stacked = constraints.maxWidth < 680;
+        final stacked = constraints.maxWidth < stackedBreakpoint;
         final isWindows = defaultTargetPlatform == TargetPlatform.windows;
         if (constraints.maxWidth < 140) {
           return Directionality(
@@ -52,19 +54,43 @@ class AppPageHeader extends StatelessWidget {
                           Expanded(child: _WindowDragArea(height: 40))
                         else
                           const Spacer(),
-                        Flexible(
-                          child: _PageTitle(title: title, compact: true),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: _PeriodSelector(
-                        selectedPeriod: selectedPeriod,
-                        onPeriodChanged: onPeriodChanged,
-                        compact: true,
-                      ),
+                    LayoutBuilder(
+                      builder: (context, rowConstraints) {
+                        final periodSelector = SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: _PeriodSelector(
+                            selectedPeriod: selectedPeriod,
+                            onPeriodChanged: onPeriodChanged,
+                            compact: true,
+                          ),
+                        );
+                        final pageTitle = _PageTitle(
+                          title: title,
+                          compact: true,
+                        );
+                        return rowConstraints.maxWidth >= stackedBreakpoint
+                            ? Row(
+                                children: [
+                                  Expanded(child: periodSelector),
+                                  const SizedBox(width: 12),
+                                  pageTitle,
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                children: [
+                                  Center(child: periodSelector),
+                                  Align(
+                                    alignment: AlignmentDirectional.centerEnd,
+                                    child: pageTitle,
+                                  ),
+                                ],
+                              );
+                      },
                     ),
                   ],
                 )

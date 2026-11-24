@@ -11,11 +11,6 @@
 
 namespace {
 
-/// Window attribute that enables dark mode window decorations.
-///
-/// Redefined in case the developer's machine has a Windows SDK older than
-/// version 10.0.22000.0.
-/// See: https://docs.microsoft.com/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute
 #ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
@@ -25,7 +20,8 @@ constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 // Minimum outer-window dimensions in logical pixels. Keep these aligned with
 // ResponsiveDimensions in lib/core/layout/responsive_dimensions.dart.
 constexpr int kMinimumWindowWidth = 900;
-constexpr int kMinimumWindowHeight = 640;
+constexpr int kMinimumWindowHeight = 540;
+constexpr int kLinkedResizeStep = 8;
 
 /// Registry key for app theme preference.
 ///
@@ -266,6 +262,20 @@ bool Win32Window::IsMaximizeButtonHit(HWND const window,
   return PtInRect(&maximize_button, point) != FALSE;
 }
 
+bool Win32Window::IsWindowControlsHit(HWND const window,
+                                      LPARAM const lparam) const {
+  POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+  MapWindowPoints(nullptr, window, &point, 1);
+
+  RECT client{};
+  if (!GetClientRect(window, &client)) return false;
+
+  const int button_size = MulDiv(34, GetDpiForWindow(window), 96);
+  const RECT controls = {client.right - button_size * 3, client.top,
+                         client.right, client.top + button_size};
+  return PtInRect(&controls, point) != FALSE;
+}
+
 void Win32Window::CompleteMaximizeButtonClick(HWND const window,
                                              POINT screen_point) {
   const bool released_on_button = IsMaximizeButtonHit(
@@ -294,6 +304,52 @@ Win32Window::MessageHandler(HWND hwnd,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_SIZING: {
+      const bool horizontal_resize =
+          wparam == WMSZ_LEFT || wparam == WMSZ_RIGHT;
+      const bool vertical_resize =
+          wparam == WMSZ_TOP || wparam == WMSZ_BOTTOM;
+      if (!horizontal_resize && !vertical_resize) break;
+
+      auto bounds = reinterpret_cast<RECT*>(lparam);
+      if (bounds == nullptr) break;
+
+      RECT current_bounds{};
+      if (!GetWindowRect(hwnd, &current_bounds)) break;
+
+      const int current_height =
+          current_bounds.bottom - current_bounds.top;
+      const int current_width =
+          current_bounds.right - current_bounds.left;
+      const UINT dpi = GetDpiForWindow(hwnd);
+      if (horizontal_resize) {
+        const int proposed_width = bounds->right - bounds->left;
+        int height = current_height +
+                     MulDiv(proposed_width - current_width, 1,
+                            kLinkedResizeStep);
+        const int minimum_height = Scale(kMinimumWindowHeight, dpi / 96.0);
+        height = (std::max)(height, minimum_height);
+
+        const LONG vertical_center =
+            current_bounds.top + current_height / 2;
+        bounds->top = vertical_center - height / 2;
+        bounds->bottom = bounds->top + height;
+      } else {
+        const int proposed_height = bounds->bottom - bounds->top;
+        int width = current_width +
+                    MulDiv(proposed_height - current_height, current_width,
+                           current_height);
+        const int minimum_width = Scale(kMinimumWindowWidth, dpi / 96.0);
+        width = (std::max)(width, minimum_width);
+
+        const LONG horizontal_center =
+            current_bounds.left + current_width / 2;
+        bounds->left = horizontal_center - width / 2;
+        bounds->right = bounds->left + width;
+      }
+      return TRUE;
+    }
+
     case WM_NCLBUTTONDOWN:
       if (wparam == HTMAXBUTTON) {
         maximize_button_pressed_ = true;
@@ -359,6 +415,7 @@ Win32Window::MessageHandler(HWND hwnd,
 
     case WM_NCHITTEST: {
       if (IsMaximizeButtonHit(hwnd, lparam)) return HTMAXBUTTON;
+      if (IsWindowControlsHit(hwnd, lparam)) return HTCLIENT;
       // Compute resize zones directly from the physical window bounds. The
       // default hit test can report client hits for a popup-style frameless
       // window even where the thick-frame resize cursor is expected.
@@ -366,7 +423,7 @@ Win32Window::MessageHandler(HWND hwnd,
       POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
       RECT bounds{};
       if (!GetWindowRect(hwnd, &bounds)) return HTCLIENT;
-      const int edge = std::max(1, MulDiv(10, GetDpiForWindow(hwnd), 96));
+      const int edge = (std::max)(1, MulDiv(7, GetDpiForWindow(hwnd), 96));
       const bool left = point.x < bounds.left + edge;
       const bool right = point.x >= bounds.right - edge;
       const bool top = point.y < bounds.top + edge;

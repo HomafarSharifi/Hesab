@@ -7,5 +7,5 @@ abstract final class ResponsiveDimensions {
   static const double minimumWindowWidth = 900;
 
   /// Minimum supported height for the native Windows window, in logical pixels.
-  static const double minimumWindowHeight = 640;
+  static const double minimumWindowHeight = 540;
 }

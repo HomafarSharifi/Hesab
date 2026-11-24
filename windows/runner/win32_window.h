@@ -102,6 +102,7 @@ class Win32Window {
                                    WPARAM const wparam,
                                    LPARAM const lparam) noexcept;
   bool IsMaximizeButtonHit(HWND const window, LPARAM const lparam) const;
+  bool IsWindowControlsHit(HWND const window, LPARAM const lparam) const;
   void CompleteMaximizeButtonClick(HWND const window, POINT screen_point);
   void ForwardNonClientMouseMove(HWND const window, LPARAM const lparam,
                                  WPARAM const button_state);

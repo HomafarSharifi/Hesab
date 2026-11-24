@@ -105,10 +105,41 @@ class _HesabShellState extends State<HesabShell> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+            const expandedSidebarWidth = 280.0;
+            final expandedContentWidth =
+                constraints.maxWidth - expandedSidebarWidth;
+            final expandedHeaderPadding = (expandedContentWidth * 0.045)
+                .clamp(18.0, 64.0)
+                .toDouble();
+            final expandedHeaderContentWidth =
+                expandedContentWidth - expandedHeaderPadding * 2;
+            final expandedHeaderControlsHeight =
+                expandedHeaderContentWidth < AppPageHeader.stackedBreakpoint
+                ? 92.0
+                : expandedHeaderContentWidth < 900
+                ? 44.0
+                : 56.0;
+            final expandedHeaderHeight = 25.0 + expandedHeaderControlsHeight;
+            final expandedPageHeight =
+                (constraints.maxHeight - expandedHeaderHeight)
+                    .clamp(0.0, constraints.maxHeight)
+                    .toDouble();
+            final dashboardBottomInset = _selectedIndex == 0
+                ? DashboardScreen.pageInset
+                : 0.0;
+            final expandedPanelHeight = (expandedPageHeight -
+                    dashboardBottomInset)
+                .clamp(0.0, expandedPageHeight)
+                .toDouble();
+            final expandedNavigationIsCompact = expandedPageHeight < 760;
+            final expandedNavigationHeight = expandedNavigationIsCompact
+                ? _Sidebar.compactLabeledHeight
+                : _Sidebar.labeledHeight;
             final collapsedSidebar =
                 constraints.maxWidth <
-                ResponsiveDimensions.expandedNavigationBreakpoint;
-            final sidebarWidth = collapsedSidebar ? 82.0 : 280.0;
+                    ResponsiveDimensions.expandedNavigationBreakpoint ||
+                expandedPanelHeight < expandedNavigationHeight;
+            final sidebarWidth = collapsedSidebar ? 82.0 : expandedSidebarWidth;
             final contentWidth = constraints.maxWidth - sidebarWidth;
             final headerHorizontalPadding = (contentWidth * 0.045)
                 .clamp(18.0, 64.0)
@@ -119,28 +150,51 @@ class _HesabShellState extends State<HesabShell> {
               textDirection: TextDirection.ltr,
               child: Stack(
                 children: [
-                  Row(
+                  Column(
                     children: [
-                      Expanded(
-                        child: _buildContent(context, headerHorizontalPadding),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildHeader(
+                              context,
+                              headerHorizontalPadding,
+                            ),
+                          ),
+                          SizedBox(width: sidebarWidth),
+                        ],
                       ),
-                      SizedBox(
-                        width: sidebarWidth,
-                        child: Padding(
-                          padding: EdgeInsetsDirectional.fromSTEB(
-                            0,
-                            collapsedSidebar ? 8 : 18,
-                            collapsedSidebar ? 8 : 18,
-                            collapsedSidebar ? 8 : 18,
-                          ),
-                          child: _Sidebar(
-                            selectedIndex: _selectedIndex,
-                            items: _navigationItems,
-                            onSelect: _selectPage,
-                            onNewExpense: _startNewExpense,
-                            iconOnly: collapsedSidebar,
-                            reserveWindowControls: hasWindowControls,
-                          ),
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: _buildScreen()),
+                            SizedBox(
+                              width: sidebarWidth,
+                              child: Padding(
+                                padding: EdgeInsetsDirectional.symmetric(
+                                  horizontal: collapsedSidebar ? 8 : 18,
+                                ),
+                                child: LayoutBuilder(
+                                  builder: (context, sidebarConstraints) {
+                                    return _Sidebar(
+                                      height: (sidebarConstraints.maxHeight -
+                                              dashboardBottomInset)
+                                          .clamp(
+                                            0.0,
+                                            sidebarConstraints.maxHeight,
+                                          )
+                                          .toDouble(),
+                                      selectedIndex: _selectedIndex,
+                                      items: _navigationItems,
+                                      onSelect: _selectPage,
+                                      onNewExpense: _startNewExpense,
+                                      iconOnly: collapsedSidebar,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -163,83 +217,83 @@ class _HesabShellState extends State<HesabShell> {
     );
   }
 
-  Widget _buildContent(BuildContext context, double horizontalPadding) =>
-      Column(
-        children: [
-          Padding(
-            padding: EdgeInsetsDirectional.fromSTEB(
-              horizontalPadding,
-              12,
-              horizontalPadding,
-              12,
-            ),
-            child: AppPageHeader(
-              title: _navigationItems[_selectedIndex].label,
-              selectedPeriod: _selectedPeriod,
-              onPeriodChanged: _selectPeriod,
-              isDarkMode: widget.isDarkMode,
-              onToggleTheme: widget.onToggleTheme,
-            ),
-          ),
-          Padding(
-            padding: EdgeInsetsDirectional.symmetric(
-              horizontal: horizontalPadding,
-            ),
-            child: Divider(color: Theme.of(context).dividerColor, height: 1),
-          ),
-          Expanded(
-            child: switch (_selectedIndex) {
-              0 => DashboardScreen(
-                services: widget.services,
-                fromDate: _periodFrom,
-                toDate: _periodTo,
-                selectedPeriod: _selectedPeriod,
-                onAddFunds: () => setState(() => _selectedIndex = 3),
-                onCreateWallet: () => setState(() => _selectedIndex = 3),
-                onCreatePurchase: _startNewExpense,
-              ),
-              1 => ExpensesScreen(
-                services: widget.services,
-                fromDate: _periodFrom,
-                toDate: _periodTo,
-                newPurchaseRequest: _newExpenseRequest,
-                onCreateWallet: () => setState(() => _selectedIndex = 3),
-              ),
-              2 => CatalogScreen(services: widget.services),
-              3 => WalletScreen(services: widget.services),
-              4 => ReportsScreen(
-                services: widget.services,
-                fromDate: _periodFrom,
-                toDate: _periodTo,
-                onCreatePurchase: _startNewExpense,
-                onCreateWallet: () => setState(() => _selectedIndex = 3),
-              ),
-              _ => SettingsScreen(
-                services: widget.services,
-                onDatabaseChanged: widget.onDatabaseChanged,
-              ),
-            },
-          ),
-        ],
-      );
+  Widget _buildHeader(BuildContext context, double horizontalPadding) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Padding(
+        padding: EdgeInsetsDirectional.fromSTEB(
+          horizontalPadding,
+          12,
+          horizontalPadding,
+          12,
+        ),
+        child: AppPageHeader(
+          title: _navigationItems[_selectedIndex].label,
+          selectedPeriod: _selectedPeriod,
+          onPeriodChanged: _selectPeriod,
+          isDarkMode: widget.isDarkMode,
+          onToggleTheme: widget.onToggleTheme,
+        ),
+      ),
+      Padding(
+        padding: EdgeInsetsDirectional.symmetric(horizontal: horizontalPadding),
+        child: Divider(color: Theme.of(context).dividerColor, height: 1),
+      ),
+    ],
+  );
+
+  Widget _buildScreen() => switch (_selectedIndex) {
+    0 => DashboardScreen(
+      services: widget.services,
+      fromDate: _periodFrom,
+      toDate: _periodTo,
+      selectedPeriod: _selectedPeriod,
+      onAddFunds: () => setState(() => _selectedIndex = 3),
+      onCreateWallet: () => setState(() => _selectedIndex = 3),
+      onCreatePurchase: _startNewExpense,
+    ),
+    1 => ExpensesScreen(
+      services: widget.services,
+      fromDate: _periodFrom,
+      toDate: _periodTo,
+      newPurchaseRequest: _newExpenseRequest,
+      onCreateWallet: () => setState(() => _selectedIndex = 3),
+    ),
+    2 => CatalogScreen(services: widget.services),
+    3 => WalletScreen(services: widget.services),
+    4 => ReportsScreen(
+      services: widget.services,
+      fromDate: _periodFrom,
+      toDate: _periodTo,
+      onCreatePurchase: _startNewExpense,
+      onCreateWallet: () => setState(() => _selectedIndex = 3),
+    ),
+    _ => SettingsScreen(
+      services: widget.services,
+      onDatabaseChanged: widget.onDatabaseChanged,
+    ),
+  };
 }
 
 class _Sidebar extends StatelessWidget {
+  static const compactLabeledHeight = 444.0;
+  static const labeledHeight = 586.0;
+
   const _Sidebar({
+    required this.height,
     required this.selectedIndex,
     required this.items,
     required this.onSelect,
     required this.onNewExpense,
     required this.iconOnly,
-    required this.reserveWindowControls,
   });
 
+  final double height;
   final int selectedIndex;
   final List<_NavigationItem> items;
   final ValueChanged<int> onSelect;
   final VoidCallback onNewExpense;
   final bool iconOnly;
-  final bool reserveWindowControls;
 
   @override
   Widget build(BuildContext context) {
@@ -249,84 +303,73 @@ class _Sidebar extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxHeight < 760;
-          return SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                padding: compact
-                    ? EdgeInsetsDirectional.fromSTEB(
-                        16,
-                        reserveWindowControls ? 48 : 14,
-                        16,
-                        14,
-                      )
-                    : EdgeInsetsDirectional.fromSTEB(
-                        16,
-                        reserveWindowControls ? 48 : 18,
-                        16,
-                        16,
+          return SizedBox(
+            height: height,
+            child: Container(
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(22),
+              ),
+              padding: EdgeInsetsDirectional.fromSTEB(
+                iconOnly ? 0 : 16,
+                compact ? 8 : 12,
+                iconOnly ? 0 : 16,
+                compact ? 14 : 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!iconOnly) _HesabMark(compact: compact),
+                  if (iconOnly)
+                    Tooltip(
+                      message: 'ثبت مصرف',
+                      child: IconButton.filled(
+                        onPressed: onNewExpense,
+                        icon: const Icon(Icons.add_rounded),
                       ),
-                child: Column(
-                  children: [
-                    if (!iconOnly) _HesabMark(compact: compact),
-                    if (iconOnly)
-                      Tooltip(
-                        message: 'ثبت مصرف',
-                        child: IconButton.filled(
-                          onPressed: onNewExpense,
-                          icon: const Icon(Icons.add_rounded),
+                    ),
+                  SizedBox(height: compact ? 10 : 18),
+                  if (!iconOnly)
+                    SizedBox(
+                      width: double.infinity,
+                      height: compact ? 48 : HesabTheme.sidebarActionHeight,
+                      child: FilledButton.icon(
+                        onPressed: onNewExpense,
+                        icon: Icon(Icons.add_rounded, size: compact ? 21 : 26),
+                        label: Text(
+                          'ثبت مصرف',
+                          style: TextStyle(
+                            fontSize: compact
+                                ? HesabTheme.fontBody
+                                : HesabTheme.fontControl,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                    SizedBox(height: compact ? 10 : 18),
-                    if (!iconOnly)
-                      SizedBox(
-                        width: double.infinity,
-                        height: compact ? 48 : HesabTheme.sidebarActionHeight,
-                        child: FilledButton.icon(
-                          onPressed: onNewExpense,
-                          icon: Icon(
-                            Icons.add_rounded,
-                            size: compact ? 21 : 26,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colors.primary,
+                          foregroundColor: colors.onPrimary,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: compact ? 6 : 16,
                           ),
-                          label: Text(
-                            'ثبت مصرف',
-                            style: TextStyle(
-                              fontSize: compact
-                                  ? HesabTheme.fontBody
-                                  : HesabTheme.fontControl,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: colors.primary,
-                            foregroundColor: colors.onPrimary,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: compact ? 6 : 16,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
                           ),
                         ),
                       ),
-                    SizedBox(height: compact ? 12 : 20),
-                    for (var i = 0; i < items.length; i++) ...[
-                      _NavigationButton(
-                        item: items[i],
-                        selected: i == selectedIndex,
-                        compact: compact,
-                        iconOnly: iconOnly,
-                        onTap: () => onSelect(i),
-                      ),
-                      if (i != items.length - 1)
-                        SizedBox(height: compact ? 6 : 12),
-                    ],
+                    ),
+                  SizedBox(height: compact ? 12 : 20),
+                  for (var i = 0; i < items.length; i++) ...[
+                    _NavigationButton(
+                      item: items[i],
+                      selected: i == selectedIndex,
+                      compact: compact,
+                      iconOnly: iconOnly,
+                      onTap: () => onSelect(i),
+                    ),
+                    if (i != items.length - 1)
+                      SizedBox(height: compact ? 6 : 12),
                   ],
-                ),
+                ],
               ),
             ),
           );
@@ -390,25 +433,28 @@ class _NavigationButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final button = Material(
-      color: selected
-          ? HesabTheme.selectionSurface(context)
-          : Colors.transparent,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: SizedBox(
-          height: compact ? 44 : 58,
+    final buttonHeight = compact ? 44.0 : 58.0;
+    final buttonShape = iconOnly
+        ? const CircleBorder()
+        : RoundedRectangleBorder(borderRadius: BorderRadius.circular(20));
+    final button = SizedBox(
+      width: iconOnly ? buttonHeight : double.infinity,
+      height: buttonHeight,
+      child: Material(
+        color: selected
+            ? HesabTheme.selectionSurface(context)
+            : Colors.transparent,
+        shape: buttonShape,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: buttonShape,
           child: Padding(
             padding: EdgeInsetsDirectional.only(
-              start: compact ? 10 : 18,
-              end: compact ? 10 : 18,
+              start: iconOnly ? 0 : (compact ? 10 : 18),
+              end: iconOnly ? 0 : (compact ? 10 : 18),
             ),
             child: Row(
-              mainAxisAlignment: iconOnly
-                  ? MainAxisAlignment.center
-                  : MainAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 SvgPicture.asset(
                   item.assetPath,
@@ -445,7 +491,16 @@ class _NavigationButton extends StatelessWidget {
         ),
       ),
     );
-    return iconOnly ? Tooltip(message: item.label, child: button) : button;
+    return iconOnly
+        ? Tooltip(
+            message: item.label,
+            child: SizedBox(
+              width: double.infinity,
+              height: buttonHeight,
+              child: Center(child: button),
+            ),
+          )
+        : button;
   }
 }
 

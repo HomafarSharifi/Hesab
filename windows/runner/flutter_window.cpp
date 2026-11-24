@@ -131,7 +131,7 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   // Native non-client hit testing must take precedence so Flutter never turns
   // resize borders into client input. All other messages remain Flutter-first.
   if (message == WM_NCCALCSIZE || message == WM_NCHITTEST ||
-      message == WM_GETMINMAXINFO) {
+      message == WM_GETMINMAXINFO || message == WM_SIZING) {
     return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
   }
 
