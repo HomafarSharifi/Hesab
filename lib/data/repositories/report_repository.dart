@@ -5,6 +5,81 @@ class ReportRepository {
 
   final DatabaseExecutor _database;
 
+  Future<Map<int, ({int receivedMinor, int spentMinor, int activityMinor})>>
+  walletPeriodTotals({
+    DateTime? fromDate,
+    DateTime? toDate,
+  }) async {
+    final dateClauses = [
+      if (fromDate != null) 'AND t.transaction_date >= ?',
+      if (toDate != null) 'AND t.transaction_date <= ?',
+    ].join(' ');
+    final dateArguments = [
+      if (fromDate != null) _dateOnly(fromDate),
+      if (toDate != null) _dateOnly(toDate),
+    ];
+    final rows = await _database.rawQuery(
+      '''
+      WITH wallet_totals AS (
+        SELECT t.wallet_id,
+          SUM(CASE WHEN NOT EXISTS (
+            SELECT 1 FROM wallet_transaction reversal
+            WHERE reversal.reversal_of_transaction_id = t.transaction_id
+          ) THEN t.amount_minor ELSE 0 END) AS received_minor,
+          0 AS spent_minor, SUM(t.amount_minor) AS activity_minor
+        FROM wallet_transaction t
+        WHERE t.transaction_type = 'deposit'
+          AND NOT EXISTS (
+            SELECT 1 FROM wallet_transaction reversal
+            WHERE reversal.reversal_of_transaction_id = t.transaction_id
+          )
+          $dateClauses
+        GROUP BY t.wallet_id
+
+        UNION ALL
+
+        SELECT allocation.wallet_id, 0 AS received_minor,
+          SUM(CASE WHEN NOT EXISTS (
+            SELECT 1 FROM wallet_transaction reversal
+            WHERE reversal.reversal_of_transaction_id = t.transaction_id
+          ) THEN allocation.amount_minor ELSE 0 END) AS spent_minor,
+          SUM(allocation.amount_minor) AS activity_minor
+        FROM purchase_wallet_allocation allocation
+        JOIN wallet_transaction t ON t.transaction_id = allocation.transaction_id
+        WHERE t.transaction_type = 'purchase'
+          AND NOT EXISTS (
+            SELECT 1 FROM wallet_transaction reversal
+            WHERE reversal.reversal_of_transaction_id = t.transaction_id
+          )
+          $dateClauses
+        GROUP BY allocation.wallet_id
+
+        UNION ALL
+
+        SELECT t.wallet_id, 0 AS received_minor, 0 AS spent_minor,
+          SUM(t.amount_minor) AS activity_minor
+        FROM wallet_transaction t
+        WHERE t.transaction_type = 'withdrawal'
+          $dateClauses
+        GROUP BY t.wallet_id
+      )
+      SELECT wallet_id, SUM(received_minor) AS received_minor,
+        SUM(spent_minor) AS spent_minor, SUM(activity_minor) AS activity_minor
+      FROM wallet_totals
+      GROUP BY wallet_id
+      ''',
+      [...dateArguments, ...dateArguments, ...dateArguments],
+    );
+    return {
+      for (final row in rows)
+        row['wallet_id']! as int: (
+          receivedMinor: row['received_minor']! as int,
+          spentMinor: row['spent_minor']! as int,
+          activityMinor: row['activity_minor']! as int,
+        ),
+    };
+  }
+
   Future<List<ReportDatedAmount>> itemPurchaseAmounts({
     required int itemId,
   }) async {

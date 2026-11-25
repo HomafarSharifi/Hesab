@@ -12,10 +12,17 @@ class ItemExpenseTrendCard extends StatefulWidget {
   const ItemExpenseTrendCard({
     required this.items,
     required this.loadMonthlyExpenses,
+    required this.loadYearlyExpenses,
+    required this.fromDate,
+    required this.selectedPeriod,
     super.key,
   });
 
   final List<ItemRecord> items;
+  final Future<Map<String, int>> Function({required int itemId})
+  loadYearlyExpenses;
+  final DateTime fromDate;
+  final int selectedPeriod;
   final Future<Map<String, int>> Function({
     required int itemId,
     required int jalaliYear,
@@ -29,10 +36,31 @@ class ItemExpenseTrendCard extends StatefulWidget {
 class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
   int? _itemId;
   int _year = JalaliDate.fromGregorian(DateTime.now()).year;
+  int? _customYearOverride;
   bool _yearView = false;
   int? _hoveredIndex;
   String? _requestedKey;
   Future<Map<String, int>>? _chartFuture;
+  final _yearScrollController = ScrollController();
+
+  int get _activeYear => widget.selectedPeriod == 2
+      ? _customYearOverride ?? JalaliDate.fromGregorian(widget.fromDate).year
+      : _year;
+
+  @override
+  void didUpdateWidget(covariant ItemExpenseTrendCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedPeriod != oldWidget.selectedPeriod ||
+        widget.fromDate != oldWidget.fromDate) {
+      _customYearOverride = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _yearScrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,15 +70,22 @@ class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
         : widget.items.isEmpty
         ? null
         : widget.items.first.id;
-    final chartKey = '$selectedId-$_year-$_yearView';
+    final activeYear = _activeYear;
+    final chartKey = '$selectedId-$activeYear-$_yearView';
     if (selectedId != null && chartKey != _requestedKey) {
       _requestedKey = chartKey;
       _chartFuture = _yearView
           ? _loadYearlyExpenses(selectedId)
-          : widget.loadMonthlyExpenses(itemId: selectedId, jalaliYear: _year);
+          : widget.loadMonthlyExpenses(
+              itemId: selectedId,
+              jalaliYear: activeYear,
+            );
     }
     final currentJalaliYear = JalaliDate.fromGregorian(DateTime.now()).year;
-    final years = List<int>.generate(101, (index) => currentJalaliYear - index);
+    final years = List<int>.generate(
+      currentJalaliYear - 1392,
+      (index) => currentJalaliYear - index,
+    );
     final selectedItem = widget.items.where((item) => item.id == selectedId);
     final selectedItemName = selectedItem.isEmpty
         ? 'انتخاب جنس'
@@ -94,14 +129,17 @@ class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
               ),
               if (!_yearView)
                 _FilterMenuButton<int>(
-                  label: _chartDariDigits(_year.toString()),
-                  selected: _year,
+                  label: _chartDariDigits(activeYear.toString()),
+                  selected: activeYear,
                   options: [
                     for (final year in years)
                       (year, _chartDariDigits(year.toString())),
                   ],
                   onSelected: (value) => setState(() {
                     _year = value;
+                    if (widget.selectedPeriod == 2) {
+                      _customYearOverride = value;
+                    }
                     _hoveredIndex = null;
                   }),
                 ),
@@ -129,13 +167,12 @@ class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
                     ),
                   )
                 : FutureBuilder<Map<String, int>>(
-                    key: ValueKey('$selectedId-$_year-$_yearView'),
+                    key: ValueKey('$selectedId-$activeYear-$_yearView'),
                     future: _chartFuture,
                     builder: (context, snapshot) {
-                      final chartYears = List<int>.generate(
-                        5,
-                        (i) => _year - 4 + i,
-                      );
+                      final chartYears = _yearView
+                          ? _yearRange(snapshot.data)
+                          : const <int>[];
                       final labels = _yearView
                           ? chartYears
                                 .map(
@@ -144,10 +181,10 @@ class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
                                 .toList()
                           : afghanJalaliMonths;
                       final values = _yearView
-                          ? List<int>.generate(
-                              5,
-                              (i) => snapshot.data?['${chartYears[i]}'] ?? 0,
-                            )
+                          ? [
+                              for (final year in chartYears)
+                                snapshot.data?['$year'] ?? 0,
+                            ]
                           : List<int>.generate(
                               12,
                               (i) =>
@@ -159,12 +196,23 @@ class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
                             );
                       final currentMonthIndex =
                           JalaliDate.fromGregorian(DateTime.now()).month - 1;
+                      if (_yearView &&
+                          snapshot.connectionState == ConnectionState.done &&
+                          chartYears.isEmpty) {
+                        return Center(
+                          child: Text(
+                            'برای این جنس هنوز مصرفی ثبت نشده است.',
+                            style: TextStyle(color: colors.onSurfaceVariant),
+                          ),
+                        );
+                      }
+                      final visibleValues = values.isEmpty ? [0] : values;
                       final active =
                           (_hoveredIndex ??
                                   (_yearView
-                                      ? values.length - 1
+                                      ? visibleValues.length - 1
                                       : currentMonthIndex))
-                              .clamp(0, values.length - 1)
+                              .clamp(0, visibleValues.length - 1)
                               .toInt();
                       return Column(
                         children: [
@@ -173,29 +221,66 @@ class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
                             const LinearProgressIndicator(minHeight: 2),
                           Expanded(
                             child: LayoutBuilder(
-                              builder: (context, box) => MouseRegion(
-                                onHover: (event) {
-                                  final slot = box.maxWidth / values.length;
-                                  final index = (event.localPosition.dx / slot)
-                                      .floor()
-                                      .clamp(0, values.length - 1)
-                                      .toInt();
-                                  if (_hoveredIndex != index) {
-                                    setState(() => _hoveredIndex = index);
-                                  }
-                                },
-                                onExit: (_) =>
-                                    setState(() => _hoveredIndex = null),
-                                child: CustomPaint(
-                                  size: Size(box.maxWidth, box.maxHeight),
-                                  painter: _ReferencePillBars(
-                                    values: values,
-                                    labels: labels,
-                                    activeIndex: active,
-                                    colors: colors,
+                              builder: (context, box) {
+                                final chartValues =
+                                    values.isEmpty ? [0] : values;
+                                final chartLabels =
+                                    labels.isEmpty ? [''] : labels;
+                                final chartWidth = _yearView
+                                    ? math.max(
+                                        box.maxWidth,
+                                        chartValues.length * 44.0,
+                                      ).toDouble()
+                                    : box.maxWidth;
+                                final canScroll = chartWidth > box.maxWidth;
+                                return Scrollbar(
+                                  controller: _yearScrollController,
+                                  thumbVisibility: canScroll,
+                                  thickness: 3,
+                                  radius: const Radius.circular(3),
+                                  child: SingleChildScrollView(
+                                    controller: _yearScrollController,
+                                    scrollDirection: Axis.horizontal,
+                                    child: SizedBox(
+                                      width: chartWidth,
+                                      child: MouseRegion(
+                                        onHover: (event) {
+                                          final slot =
+                                              chartWidth / chartValues.length;
+                                          final index =
+                                              (event.localPosition.dx / slot)
+                                              .floor()
+                                              .clamp(
+                                                0,
+                                                chartValues.length - 1,
+                                              )
+                                              .toInt();
+                                          if (_hoveredIndex != index) {
+                                            setState(
+                                              () => _hoveredIndex = index,
+                                            );
+                                          }
+                                        },
+                                        onExit: (_) => setState(
+                                          () => _hoveredIndex = null,
+                                        ),
+                                        child: CustomPaint(
+                                          size: Size(
+                                            chartWidth,
+                                            box.maxHeight,
+                                          ),
+                                          painter: _ReferencePillBars(
+                                            values: chartValues,
+                                            labels: chartLabels,
+                                            activeIndex: active,
+                                            colors: colors,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -208,19 +293,20 @@ class _ItemExpenseTrendCardState extends State<ItemExpenseTrendCard> {
     );
   }
 
-  Future<Map<String, int>> _loadYearlyExpenses(int itemId) async {
-    final chartYears = List<int>.generate(5, (i) => _year - 4 + i);
-    final annual = await Future.wait([
-      for (final year in chartYears)
-        widget.loadMonthlyExpenses(itemId: itemId, jalaliYear: year),
-    ]);
-    return {
-      for (var i = 0; i < chartYears.length; i++)
-        '${chartYears[i]}': annual[i].values.fold<int>(
-          0,
-          (sum, amount) => sum + amount,
-        ),
-    };
+  Future<Map<String, int>> _loadYearlyExpenses(int itemId) =>
+      widget.loadYearlyExpenses(itemId: itemId);
+
+  List<int> _yearRange(Map<String, int>? totals) {
+    final years = (totals ?? const <String, int>{}).entries
+        .where((entry) => int.parse(entry.key) > 1392 && entry.value > 0)
+        .map((entry) => int.parse(entry.key))
+        .toList()
+      ..sort();
+    if (years.isEmpty) return const [];
+    return List<int>.generate(
+      years.last - years.first + 1,
+      (index) => years.first + index,
+    );
   }
 }
 

@@ -2,21 +2,25 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/hesab_theme.dart';
 import '../../../core/finance/amount_codec.dart';
+import '../../../data/models/catalog_models.dart';
 import '../../../data/models/financial_models.dart';
 
 class WalletSummaryCard extends StatefulWidget {
   const WalletSummaryCard({
     required this.onAddFunds,
-    required this.balanceMinor,
-    required this.spentMinor,
-    required this.receivedMinor,
+    required this.wallets,
+    required this.walletPeriodTotals,
+    required this.preferredWalletId,
+    required this.walletSelectionKey,
     super.key,
   });
 
   final VoidCallback onAddFunds;
-  final int? balanceMinor;
-  final int? spentMinor;
-  final int? receivedMinor;
+  final List<WalletRecord> wallets;
+  final Map<int, ({int receivedMinor, int spentMinor, int activityMinor})>
+  walletPeriodTotals;
+  final int? preferredWalletId;
+  final String walletSelectionKey;
 
   @override
   State<WalletSummaryCard> createState() => _WalletSummaryCardState();
@@ -24,9 +28,29 @@ class WalletSummaryCard extends StatefulWidget {
 
 class _WalletSummaryCardState extends State<WalletSummaryCard> {
   bool _hideBalance = false;
+  int? _selectedWalletId;
+
+  @override
+  void didUpdateWidget(covariant WalletSummaryCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if ((widget.preferredWalletId != oldWidget.preferredWalletId ||
+            widget.walletSelectionKey != oldWidget.walletSelectionKey) &&
+        widget.preferredWalletId != null) {
+      _selectedWalletId = widget.preferredWalletId;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    WalletRecord? selectedWallet;
+    for (final wallet in widget.wallets) {
+      if (wallet.id == _selectedWalletId) selectedWallet = wallet;
+    }
+    selectedWallet ??= widget.wallets.isEmpty ? null : widget.wallets.first;
+    final walletTotals = selectedWallet == null
+        ? (receivedMinor: 0, spentMinor: 0, activityMinor: 0)
+        : widget.walletPeriodTotals[selectedWallet.id] ??
+              (receivedMinor: 0, spentMinor: 0, activityMinor: 0);
     final colors = Theme.of(context).colorScheme;
     final foreground = colors.onSurface;
     final mutedForeground = colors.onSurfaceVariant;
@@ -93,37 +117,62 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                         ),
                       ),
                       const Spacer(),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'کیف پول',
-                            style: TextStyle(
-                              color: foreground,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                      SizedBox(
+                        width: 108,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'کیف پول',
+                              style: TextStyle(
+                                color: foreground,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                          Text(
-                            'شریفی',
-                            style: TextStyle(
-                              color: mutedForeground,
-                              fontSize: 10,
+                            SizedBox(
+                              height: 28,
+                              width: double.infinity,
+                              child: selectedWallet == null
+                                  ? Text(
+                                      'کیف پولی موجود نیست',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: mutedForeground,
+                                        fontSize: 10,
+                                      ),
+                                    )
+                                  : DropdownButtonHideUnderline(
+                                      child: DropdownButton<int>(
+                                        value: selectedWallet.id,
+                                        isDense: true,
+                                        menuWidth: 128,
+                                        alignment: AlignmentDirectional.centerEnd,
+                                        style: TextStyle(
+                                          color: mutedForeground,
+                                          fontSize: 10,
+                                        ),
+                                        items: [
+                                          for (final wallet in widget.wallets)
+                                            DropdownMenuItem(
+                                              value: wallet.id,
+                                              child: Text(
+                                                wallet.name,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                        ],
+                                        onChanged: (walletId) {
+                                          if (walletId != null) {
+                                            setState(
+                                              () => _selectedWalletId = walletId,
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 9),
-                      Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: colors.primary.withValues(alpha: .1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.account_balance_wallet_rounded,
-                          color: colors.primary,
-                          size: 18,
+                          ],
                         ),
                       ),
                     ],
@@ -147,7 +196,7 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                             _hideBalance
                                 ? '•••••• ؋'
                                 : AmountCodec.formatMoneyMinor(
-                                    widget.balanceMinor ?? 0,
+                                    selectedWallet?.balanceMinor ?? 0,
                                   ),
                             style: TextStyle(
                               color: foreground,
@@ -188,7 +237,7 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                         child: _WalletMiniSummary(
                           icon: Icons.south_west_rounded,
                           title: 'دریافتی',
-                          amountMinor: widget.receivedMinor,
+                          amountMinor: walletTotals.receivedMinor,
                           hideAmount: _hideBalance,
                           iconColor: colors.primary,
                         ),
@@ -198,7 +247,7 @@ class _WalletSummaryCardState extends State<WalletSummaryCard> {
                         child: _WalletMiniSummary(
                           icon: Icons.north_east_rounded,
                           title: 'مصرف شده',
-                          amountMinor: widget.spentMinor,
+                          amountMinor: walletTotals.spentMinor,
                           hideAmount: _hideBalance,
                           iconColor: colors.primary,
                         ),

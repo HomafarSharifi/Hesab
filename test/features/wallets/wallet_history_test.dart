@@ -11,7 +11,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'history merges ledger and profile events with wallet allocations',
+    'wallet activity shows creation, deposits, and edits only',
     () async {
       final fixture = await _createFixture();
       addTearDown(fixture.database.close);
@@ -63,17 +63,17 @@ void main() {
         unitPriceMinor: 3500,
         note: 'خرید چندکیف پولی',
       );
-      final purchaseReversalId = await transactions.reverse(
+      await transactions.reverse(
         transactionId: purchaseId,
         date: DateTime(2026, 11, 4),
         note: 'برگشت خرید',
       );
-      final depositReversalId = await transactions.reverse(
+      await transactions.reverse(
         transactionId: depositId,
         date: DateTime(2026, 11, 5),
         note: 'برگشت افزودن پول',
       );
-      final withdrawalReversalId = await transactions.reverse(
+      await transactions.reverse(
         transactionId: withdrawalId,
         date: DateTime(2026, 11, 6),
         note: 'برگشت برداشت',
@@ -88,7 +88,7 @@ void main() {
         quantityCenti: 100,
         unitPriceMinor: 1000,
       );
-      final replacementId = await transactions.correctPurchaseWithNewProduct(
+      await transactions.correctPurchaseWithNewProduct(
         originalTransactionId: originalCorrectionId,
         walletId: 1,
         productName: 'برنج',
@@ -132,133 +132,27 @@ void main() {
       );
       expect(WalletActivityPresentation.label(regularDeposit), 'پول افزوده شد');
       expect(WalletActivityPresentation.amountLabel(regularDeposit), '+10 ؋');
-      expect(
-        mainHistory.where((row) => row['event_type'] == 'withdrawal'),
-        hasLength(1),
-      );
-      final withdrawal = mainHistory.singleWhere(
-        (row) => row['transaction_id'] == withdrawalId,
-      );
-      expect(WalletActivityPresentation.label(withdrawal), 'برداشت پول');
-      expect(WalletActivityPresentation.amountLabel(withdrawal), '−95 ؋');
-
-      final mainPurchases = mainHistory
-          .where((row) => row['event_type'] == 'purchase')
-          .toList();
-      final allocatedPurchase = mainPurchases.singleWhere(
-        (row) => row['transaction_id'] == purchaseId,
-      );
-      expect(allocatedPurchase['amount_minor'], 1500);
-      expect(allocatedPurchase['item_name'], 'برنج');
-      expect(allocatedPurchase['is_reversed'], 1);
-      expect(
-        WalletActivityPresentation.label(allocatedPurchase),
-        'خرید (برگشت‌شده)',
-      );
-      expect(
-        WalletActivityPresentation.amountLabel(allocatedPurchase),
-        '−15 ؋',
-      );
-      final correctedPurchase = mainPurchases.singleWhere(
-        (row) => row['transaction_id'] == originalCorrectionId,
-      );
-      expect(correctedPurchase['is_reversed'], 1);
-      expect(
-        WalletActivityPresentation.label(correctedPurchase),
-        'خرید (برگشت‌شده)',
-      );
-      expect(
-        WalletActivityPresentation.amountLabel(correctedPurchase),
-        '−10 ؋',
-      );
-      expect(
-        mainPurchases.singleWhere(
-          (row) => row['transaction_id'] == replacementId,
-        )['is_reversed'],
-        0,
-      );
-      expect(
-        WalletActivityPresentation.label(
-          mainPurchases.singleWhere(
-            (row) => row['transaction_id'] == replacementId,
-          ),
-        ),
-        'خرید',
-      );
-      expect(
-        WalletActivityPresentation.amountLabel(
-          mainPurchases.singleWhere(
-            (row) => row['transaction_id'] == replacementId,
-          ),
-        ),
-        '−9 ؋',
-      );
-
-      final mainReversals = mainHistory
-          .where((row) => row['event_type'] == 'reversal')
-          .toList();
-      final correctionReversal = mainReversals.singleWhere(
-        (row) => row['reversal_of_transaction_id'] == originalCorrectionId,
-      );
-      expect(correctionReversal['original_type'], 'purchase');
-      expect(correctionReversal['amount_minor'], 1000);
-      expect(
-        WalletActivityPresentation.label(correctionReversal),
-        'برگشت خرید',
-      );
-      expect(
-        WalletActivityPresentation.amountLabel(correctionReversal),
-        '+10 ؋',
-      );
-      final allocatedReversal = mainReversals.singleWhere(
-        (row) => row['transaction_id'] == purchaseReversalId,
-      );
-      expect(allocatedReversal['original_type'], 'purchase');
-      expect(allocatedReversal['amount_minor'], 1500);
-      expect(allocatedReversal['item_name'], 'برنج');
-      expect(WalletActivityPresentation.label(allocatedReversal), 'برگشت خرید');
-      expect(
-        WalletActivityPresentation.amountLabel(allocatedReversal),
-        '+15 ؋',
-      );
-      final depositReversal = mainReversals.singleWhere(
-        (row) => row['transaction_id'] == depositReversalId,
-      );
-      expect(depositReversal['original_type'], 'deposit');
-      expect(
-        WalletActivityPresentation.label(depositReversal),
-        'برگشت پول افزوده‌شده',
-      );
-      expect(WalletActivityPresentation.amountLabel(depositReversal), '−10 ؋');
-      final withdrawalReversal = mainReversals.singleWhere(
-        (row) => row['transaction_id'] == withdrawalReversalId,
-      );
-      expect(withdrawalReversal['original_type'], 'withdrawal');
-      expect(
-        WalletActivityPresentation.label(withdrawalReversal),
-        'برگشت برداشت',
-      );
-      expect(
-        WalletActivityPresentation.amountLabel(withdrawalReversal),
-        '+95 ؋',
-      );
-
       final secondHistory = await transactions.walletActivities(2);
-      final secondPurchase = secondHistory.singleWhere(
-        (row) => row['transaction_id'] == purchaseId,
-      );
-      final secondReversal = secondHistory.singleWhere(
-        (row) => row['transaction_id'] == purchaseReversalId,
-      );
-      expect(secondPurchase['amount_minor'], 2000);
-      expect(secondPurchase['is_reversed'], 1);
-      expect(secondReversal['amount_minor'], 2000);
-      expect(secondReversal['original_type'], 'purchase');
-      expect(WalletActivityPresentation.amountLabel(secondPurchase), '−20 ؋');
-      expect(WalletActivityPresentation.amountLabel(secondReversal), '+20 ؋');
+      expect(secondHistory.map((row) => row['event_type']).toSet(), {
+        'created',
+        'deposit',
+      });
+      expect(secondHistory, hasLength(2));
       expect(
         secondHistory.where((row) => row['event_type'] == 'deposit'),
         hasLength(1),
+      );
+      expect(mainHistory.map((row) => row['event_type']).toSet(), {
+        'created',
+        'updated',
+        'deposit',
+      });
+      expect(mainHistory, hasLength(4));
+      expect(
+        mainHistory.every((row) => row['event_type'] != 'purchase' &&
+            row['event_type'] != 'withdrawal' &&
+            row['event_type'] != 'reversal'),
+        isTrue,
       );
 
       final recent = await transactions.walletActivities(1, limit: 3);
@@ -267,7 +161,6 @@ void main() {
         recent.map((row) => row['history_id']).toList(),
         mainHistory.take(3).map((row) => row['history_id']).toList(),
       );
-      expect(mainHistory.length, greaterThan(3));
     },
   );
 

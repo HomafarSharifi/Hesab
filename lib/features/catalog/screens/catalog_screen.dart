@@ -18,11 +18,13 @@ class _CatalogScreenState extends State<CatalogScreen> {
   int _tab = 0;
   int _revision = 0;
   final _searchController = TextEditingController();
+  final _itemsScrollController = ScrollController();
   String _search = '';
 
   @override
   void dispose() {
     _searchController.dispose();
+    _itemsScrollController.dispose();
     super.dispose();
   }
 
@@ -300,10 +302,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
     if (values.isEmpty) {
       return const Center(child: Text('هنوز چیزی ثبت نشده است.'));
     }
-    return ListView.separated(
-      itemCount: values.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
+    return Scrollbar(
+      controller: _itemsScrollController,
+      scrollbarOrientation: ScrollbarOrientation.right,
+      child: ListView.separated(
+        controller: _itemsScrollController,
+        itemCount: values.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
         final value = values[index];
         final isItem = value is ItemRecord;
         final id = isItem
@@ -349,7 +355,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
             ),
           ),
         );
-      },
+        },
+      ),
     );
   }
 }

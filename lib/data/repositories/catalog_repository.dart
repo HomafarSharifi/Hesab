@@ -359,95 +359,21 @@ class CatalogRepository {
     final suffix = limit == null ? '' : 'LIMIT $limit';
     return _database.rawQuery(
       '''
-      WITH history AS (
-        SELECT a.activity_id, NULL AS transaction_id, a.wallet_id,
-          a.event_type, a.occurred_at, NULL AS transaction_date,
-          NULL AS amount_minor, a.details, NULL AS note,
-          NULL AS original_type, NULL AS reversal_of_transaction_id,
-          0 AS is_reversed, NULL AS item_name,
-          CASE a.event_type WHEN 'created' THEN 0 ELSE 2 END AS event_priority,
-          a.activity_id AS event_id, a.event_type AS event_sort,
-          0 AS event_source
-        FROM wallet_activity a
-        WHERE a.wallet_id = ? AND a.event_type IN ('created', 'updated')
-
-        UNION ALL
-
-        SELECT NULL, t.transaction_id, t.wallet_id, t.transaction_type,
-          t.created_at, t.transaction_date, t.amount_minor,
-          CASE WHEN t.transaction_type = 'deposit' THEN COALESCE(
-            (SELECT activity.details FROM wallet_activity activity
-             WHERE activity.transaction_id = t.transaction_id
-               AND activity.event_type = 'deposit'
-             ORDER BY activity.activity_id LIMIT 1), t.note
-          ) ELSE NULL END,
-          t.note, NULL, NULL, 0, NULL, 1, t.transaction_id,
-          t.transaction_type, 1
-        FROM wallet_transaction t
-        WHERE t.wallet_id = ?
-          AND t.transaction_type IN ('deposit', 'withdrawal')
-
-        UNION ALL
-
-        SELECT NULL, t.transaction_id, allocation.wallet_id, 'purchase',
-          t.created_at, t.transaction_date, allocation.amount_minor,
-          NULL, t.note, NULL, NULL,
-          CASE WHEN EXISTS (
-            SELECT 1 FROM wallet_transaction reversal
-            WHERE reversal.reversal_of_transaction_id = t.transaction_id
-          ) THEN 1 ELSE 0 END,
-          i.item_name, 1, t.transaction_id, 'purchase', 1
-        FROM wallet_transaction t
-        JOIN purchase_wallet_allocation allocation
-          ON allocation.transaction_id = t.transaction_id
-        LEFT JOIN expense e ON e.transaction_id = t.transaction_id
-        LEFT JOIN item i ON i.item_id = e.item_id
-        WHERE allocation.wallet_id = ? AND t.transaction_type = 'purchase'
-
-        UNION ALL
-
-        SELECT NULL, reversal.transaction_id, reversal.wallet_id, 'reversal',
-          reversal.created_at, reversal.transaction_date,
-          reversal.amount_minor, NULL, reversal.note,
-          original.transaction_type,
-          reversal.reversal_of_transaction_id, 0, NULL, 1,
-          reversal.transaction_id, 'reversal', 1
-        FROM wallet_transaction reversal
-        JOIN wallet_transaction original
-          ON original.transaction_id = reversal.reversal_of_transaction_id
-        WHERE reversal.wallet_id = ?
-          AND reversal.transaction_type = 'reversal'
-          AND original.transaction_type IN ('deposit', 'withdrawal')
-
-        UNION ALL
-
-        SELECT NULL, reversal.transaction_id, allocation.wallet_id,
-          'reversal', reversal.created_at, reversal.transaction_date,
-          allocation.amount_minor, NULL, reversal.note,
-          original.transaction_type,
-          reversal.reversal_of_transaction_id, 0, i.item_name, 1,
-          reversal.transaction_id, 'reversal', 1
-        FROM wallet_transaction reversal
-        JOIN wallet_transaction original
-          ON original.transaction_id = reversal.reversal_of_transaction_id
-        JOIN purchase_wallet_allocation allocation
-          ON allocation.transaction_id = original.transaction_id
-        LEFT JOIN expense e ON e.transaction_id = original.transaction_id
-        LEFT JOIN item i ON i.item_id = e.item_id
-        WHERE allocation.wallet_id = ?
-          AND reversal.transaction_type = 'reversal'
-          AND original.transaction_type = 'purchase'
-      )
-      SELECT activity_id, transaction_id, wallet_id, event_type,
-        occurred_at, transaction_date, amount_minor, details, note,
-        original_type, reversal_of_transaction_id, is_reversed, item_name,
-        event_source || ':' || event_id AS history_id
-      FROM history
-      ORDER BY occurred_at DESC, event_priority ASC, event_id ASC,
-        event_source ASC, event_sort ASC
+      SELECT a.activity_id, a.transaction_id, a.wallet_id, a.event_type,
+        a.occurred_at, t.transaction_date, t.amount_minor, a.details,
+        NULL AS note, NULL AS original_type,
+        NULL AS reversal_of_transaction_id, 0 AS is_reversed,
+        NULL AS item_name, '0:' || a.activity_id AS history_id
+      FROM wallet_activity a
+      LEFT JOIN wallet_transaction t ON t.transaction_id = a.transaction_id
+      WHERE a.wallet_id = ?
+        AND a.event_type IN ('created', 'deposit', 'updated')
+      ORDER BY a.occurred_at DESC,
+        CASE a.event_type WHEN 'created' THEN 0 ELSE 2 END,
+        a.activity_id ASC
       $suffix
       ''',
-      [walletId, walletId, walletId, walletId, walletId],
+      [walletId],
     );
   }
 

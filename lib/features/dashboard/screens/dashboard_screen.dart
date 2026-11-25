@@ -47,6 +47,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<_DashboardData> _loadData() async {
     final wallets = await widget.services.catalog.wallets();
+    final walletPeriodTotals = await widget.services.reports.walletPeriodTotals(
+      fromDate: widget.fromDate,
+      toDate: widget.toDate,
+    );
     final report = await widget.services.reports.summary(
       fromDate: widget.fromDate,
       toDate: widget.toDate,
@@ -56,14 +60,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
       fromDate: widget.fromDate,
       toDate: widget.toDate,
     );
+    int? preferredWalletId;
+    if (widget.selectedPeriod == 2) {
+      var highestActivityMinor = 0;
+      for (final wallet in wallets) {
+        final totals = walletPeriodTotals[wallet.id];
+        final activityMinor = totals?.activityMinor ?? 0;
+        if (activityMinor > highestActivityMinor) {
+          highestActivityMinor = activityMinor;
+          preferredWalletId = wallet.id;
+        }
+      }
+    }
     return _DashboardData(
       hasWallets: wallets.isNotEmpty,
-      balanceMinor: wallets.fold<int>(
-        0,
-        (sum, wallet) => sum + wallet.balanceMinor,
-      ),
-      spentMinor: report.totalExpenseMinor,
-      receivedMinor: report.totalReceivedMinor,
+      wallets: wallets,
+      walletPeriodTotals: walletPeriodTotals,
+      preferredWalletId: preferredWalletId,
       report: report,
       items: items,
       dailyExpenses: dailyExpenses,
@@ -126,9 +139,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               flex: 28,
                               child: WalletSummaryCard(
                                 onAddFunds: widget.onAddFunds,
-                                balanceMinor: data?.balanceMinor,
-                                spentMinor: data?.spentMinor,
-                                receivedMinor: data?.receivedMinor,
+                                wallets: data?.wallets ?? const [],
+                                walletPeriodTotals:
+                                    data?.walletPeriodTotals ?? const {},
+                                preferredWalletId: data?.preferredWalletId,
+                                walletSelectionKey:
+                                    '${widget.selectedPeriod}-${widget.fromDate}-${widget.toDate}',
                               ),
                             ),
                             const SizedBox(width: 14),
@@ -174,6 +190,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               flex: 68,
                               child: ItemExpenseTrendCard(
                                 items: data?.items ?? const [],
+                                loadYearlyExpenses:
+                                    widget.services.reports.itemExpensesByYear,
+                                fromDate: widget.fromDate,
+                                selectedPeriod: widget.selectedPeriod,
                                 loadMonthlyExpenses:
                                     widget.services.reports.itemExpensesByMonth,
                               ),
@@ -196,18 +216,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
 class _DashboardData {
   const _DashboardData({
     required this.hasWallets,
-    required this.balanceMinor,
-    required this.spentMinor,
-    required this.receivedMinor,
+    required this.wallets,
+    required this.walletPeriodTotals,
+    required this.preferredWalletId,
     required this.report,
     required this.items,
     required this.dailyExpenses,
   });
 
-  final int balanceMinor;
   final bool hasWallets;
-  final int spentMinor;
-  final int receivedMinor;
+  final List<WalletRecord> wallets;
+  final Map<int, ({int receivedMinor, int spentMinor, int activityMinor})>
+  walletPeriodTotals;
+  final int? preferredWalletId;
   final ReportSummary report;
   final List<ItemRecord> items;
   final Map<String, int> dailyExpenses;

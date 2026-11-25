@@ -26,6 +26,27 @@ class ReportService {
     return totals;
   }
 
+  Future<Map<String, int>> itemExpensesByYear({required int itemId}) async {
+    final rows = await _repository.itemPurchaseAmounts(itemId: itemId);
+    final totals = <String, int>{};
+    for (final row in rows) {
+      final year = JalaliDate.fromGregorian(DateTime.parse(row.date)).year;
+      if (year <= 1392) continue;
+      totals.update(
+        year.toString(),
+        (value) => value + row.amountMinor,
+        ifAbsent: () => row.amountMinor,
+      );
+    }
+    return totals;
+  }
+
+  Future<Map<int, ({int receivedMinor, int spentMinor, int activityMinor})>>
+  walletPeriodTotals({
+    DateTime? fromDate,
+    DateTime? toDate,
+  }) => _repository.walletPeriodTotals(fromDate: fromDate, toDate: toDate);
+
   Future<Map<String, int>> expensesByDate({
     DateTime? fromDate,
     DateTime? toDate,
