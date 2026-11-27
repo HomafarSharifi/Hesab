@@ -34,11 +34,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
         final categories = await widget.services.catalog.categories();
         final units = await widget.services.catalog.units();
         if (!mounted) return;
-        final result =
-            await showDialog<({String name, int category})>(
-              context: context,
-              builder: (_) => _ItemDialog(categories: categories),
-            );
+        final result = await showDialog<({String name, int category})>(
+          context: context,
+          builder: (_) => _ItemDialog(categories: categories),
+        );
         if (result != null) {
           final defaultUnitId = units.isNotEmpty ? units.first.id : 1;
           await widget.services.catalog.createItem(
@@ -141,10 +140,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
       if (!mounted) return;
       final result = await showDialog<({String name, int category})>(
         context: context,
-        builder: (_) => _ItemDialog(
-          categories: categories,
-          initialItem: item,
-        ),
+        builder: (_) => _ItemDialog(categories: categories, initialItem: item),
       );
       if (result == null) return;
       await widget.services.catalog.updateItem(
@@ -201,66 +197,66 @@ class _CatalogScreenState extends State<CatalogScreen> {
             );
           }
           return Padding(
-          padding: EdgeInsets.all(
-            MediaQuery.sizeOf(context).width < 600 ? 12 : 24,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Wrap(
-                alignment: WrapAlignment.start,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  FilledButton.icon(
-                    onPressed: _create,
-                    icon: const Icon(Icons.add),
-                    label: const Text('افزودن'),
-                  ),
-                  SizedBox(
-                    width: 240,
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (value) => setState(() => _search = value),
-                      decoration: InputDecoration(
-                        hintText: switch (_tab) {
-                          0 => 'جستجوی جنس',
-                          1 => 'جستجوی دسته‌بندی',
-                          _ => 'جستجوی واحد',
-                        },
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        suffixIcon: _search.isEmpty
-                            ? null
-                            : IconButton(
-                                tooltip: 'پاک کردن جستجو',
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() => _search = '');
-                                },
-                                icon: const Icon(Icons.close_rounded),
-                              ),
-                        border: const OutlineInputBorder(),
+            padding: EdgeInsets.all(
+              MediaQuery.sizeOf(context).width < 600 ? 12 : 24,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Wrap(
+                  alignment: WrapAlignment.start,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _create,
+                      icon: const Icon(Icons.add),
+                      label: const Text('افزودن'),
+                    ),
+                    SizedBox(
+                      width: 240,
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) => setState(() => _search = value),
+                        decoration: InputDecoration(
+                          hintText: switch (_tab) {
+                            0 => 'جستجوی جنس',
+                            1 => 'جستجوی دسته‌بندی',
+                            _ => 'جستجوی واحد',
+                          },
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          suffixIcon: _search.isEmpty
+                              ? null
+                              : IconButton(
+                                  tooltip: 'پاک کردن جستجو',
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _search = '');
+                                  },
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                          border: const OutlineInputBorder(),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              SegmentedButton<int>(
-                segments: const [
-                  ButtonSegment(value: 0, label: Text('اجناس')),
-                  ButtonSegment(value: 1, label: Text('دسته‌بندی')),
-                  ButtonSegment(value: 2, label: Text('واحدها')),
-                ],
-                selected: {_tab},
-                onSelectionChanged: (value) =>
-                    setState(() => _tab = value.first),
-              ),
-              const SizedBox(height: 20),
-              Expanded(child: _rows(snapshot)),
-            ],
-          ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                SegmentedButton<int>(
+                  segments: const [
+                    ButtonSegment(value: 0, label: Text('اجناس')),
+                    ButtonSegment(value: 1, label: Text('دسته‌بندی')),
+                    ButtonSegment(value: 2, label: Text('واحدها')),
+                  ],
+                  selected: {_tab},
+                  onSelectionChanged: (value) =>
+                      setState(() => _tab = value.first),
+                ),
+                const SizedBox(height: 20),
+                Expanded(child: _rows(snapshot)),
+              ],
+            ),
           );
         },
       ),
@@ -273,9 +269,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
       return data.isEmpty;
     }
     final query = NameNormalizer.normalize(_search);
-    return data.where((value) =>
-      NameNormalizer.normalize(value.name).contains(query),
-    ).isEmpty;
+    return data
+        .where((value) => NameNormalizer.normalize(value.name).contains(query))
+        .isEmpty;
   }
 
   Widget _rows(AsyncSnapshot<Object> snapshot) {
@@ -283,9 +279,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (snapshot.hasError) {
-      return Center(
-        child: Text('بارگذاری دیتا انجام نشد: ${snapshot.error}'),
-      );
+      return Center(child: Text('بارگذاری دیتا انجام نشد: ${snapshot.error}'));
     }
     final loadedValues = snapshot.data! as List;
     final normalizedSearch = NameNormalizer.normalize(_search);
@@ -301,60 +295,63 @@ class _CatalogScreenState extends State<CatalogScreen> {
     if (values.isEmpty) {
       return const Center(child: Text('هنوز چیزی ثبت نشده است.'));
     }
-    return Scrollbar(
-      controller: _itemsScrollController,
-      scrollbarOrientation: ScrollbarOrientation.right,
-      child: ListView.separated(
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: Scrollbar(
         controller: _itemsScrollController,
-        itemCount: values.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-        final value = values[index];
-        final isItem = value is ItemRecord;
-        final id = isItem
-            ? value.id
-            : value is CategoryRecord
-            ? value.id
-            : (value as UnitRecord).id;
-        final label = value.name as String;
-        return Card(
-          child: ListTile(
-            minTileHeight: HesabTheme.controlHeight,
-            title: Text(
-              label,
-              style: const TextStyle(fontSize: HesabTheme.fontBody),
-            ),
-            trailing: Wrap(
-              children: [
-                IconButton(
-                  tooltip: 'ویرایش',
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: () {
-                    if (isItem) {
-                      _editItem(value);
-                    } else {
-                      _editName(_tab == 1 ? 'category' : 'unit', id, label);
-                    }
-                  },
+        scrollbarOrientation: ScrollbarOrientation.right,
+        child: ListView.separated(
+          controller: _itemsScrollController,
+          itemCount: values.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            final value = values[index];
+            final isItem = value is ItemRecord;
+            final id = isItem
+                ? value.id
+                : value is CategoryRecord
+                ? value.id
+                : (value as UnitRecord).id;
+            final label = value.name as String;
+            return Card(
+              child: ListTile(
+                minTileHeight: HesabTheme.controlHeight,
+                title: Text(
+                  label,
+                  style: const TextStyle(fontSize: HesabTheme.fontBody),
                 ),
-                IconButton(
-                  tooltip: 'حذف',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => _delete(
-                    _tab == 0
-                        ? 'item'
-                        : _tab == 1
-                        ? 'category'
-                        : 'unit',
-                    id,
-                    label,
-                  ),
+                trailing: Wrap(
+                  children: [
+                    IconButton(
+                      tooltip: 'ویرایش',
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () {
+                        if (isItem) {
+                          _editItem(value);
+                        } else {
+                          _editName(_tab == 1 ? 'category' : 'unit', id, label);
+                        }
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'حذف',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _delete(
+                        _tab == 0
+                            ? 'item'
+                            : _tab == 1
+                            ? 'category'
+                            : 'unit',
+                        id,
+                        label,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -401,10 +398,7 @@ class _NameDialogState extends State<_NameDialog> {
 }
 
 class _ItemDialog extends StatefulWidget {
-  const _ItemDialog({
-    required this.categories,
-    this.initialItem,
-  });
+  const _ItemDialog({required this.categories, this.initialItem});
   final List<CategoryRecord> categories;
   final ItemRecord? initialItem;
   @override
@@ -465,8 +459,7 @@ class _ItemDialogState extends State<_ItemDialog> {
         child: const Text('لغو'),
       ),
       FilledButton(
-        onPressed:
-            _category == null || _name.text.trim().isEmpty
+        onPressed: _category == null || _name.text.trim().isEmpty
             ? null
             : () => Navigator.pop(context, (
                 name: _name.text,
