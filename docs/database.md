@@ -4,19 +4,20 @@
 
 Hesab opens one SQLite database at startup and keeps the connection for the app session. On Windows, the file is stored at `%LOCALAPPDATA%/Hesab/hesab.sqlite3`, outside the repository and in local per-user app data. `sqflite_common_ffi` supplies the sqflite API backed by bundled SQLite for Windows desktop.
 
-The database is initialized by `HesabDatabase`. It enables and checks SQLite foreign-key enforcement on every opened connection. Version upgrades are append-only in `HesabMigrations`; the current schema version is 5. Never edit a migration that has shipped. Add a new numbered migration and raise `currentVersion` instead.
+The database is initialized by `HesabDatabase`. It enables and checks SQLite foreign-key enforcement on every opened connection. Version upgrades are append-only in `HesabMigrations`; the current schema version is 6. Never edit a migration that has shipped. Add a new numbered migration and raise `currentVersion` instead.
 
 ## Version 1 schema and later changes
 
 The migration adapts the logical tables in `database schema.txt`:
 
 - `category`, `unit`, `item`, and `wallet` retain their parent/child relationships and add normalized names plus nullable `archived_at` timestamps.
-- Categories and units are unique by normalized name. Wallets are unique by normalized name. Items are unique by normalized name, category, and unit.
+- Categories and units are unique by normalized name. Wallets are unique by normalized name. Items are unique by normalized name and category.
 - `wallet_transaction` stores a constrained transaction type and optional `reversal_of_transaction_id`. A reversal must point to an unreversed deposit, purchase, or withdrawal in the same wallet for the same amount. Reversals are unique per original transaction.
 - `expense.transaction_id` is unique, and triggers reject expenses attached to non-purchase transactions. Transactions and expense rows are immutable after insertion; corrections are represented with reversal rows.
 - `wallet_balances` computes each balance in integer minor units, including the inverse effect of a reversal. New wallets therefore have a zero balance without an opening-balance field.
 - Version 4 adds optional wallet descriptions and an append-only `wallet_activity` audit table. Wallet creation, deposits, and metadata edits are logged transactionally; existing wallets and deposits are backfilled. The wallet activity screen shows only those profile and deposit events. Purchases, withdrawals, and reversals remain in the financial transaction ledger for balance, expense, and correction accounting, but are not shown as wallet activity.
 - Version 5 corrects `wallet_balances` so a reversed purchase offsets its original allocation exactly once.
+- Version 6 deduplicates any existing items sharing `(normalized_name, category_id)` (repointing historical expenses to the canonical item) and adds a unique index on `item(normalized_name, category_id)`.
 - Foreign keys use `ON DELETE RESTRICT` so referenced categories, units, items, wallets, and transactions must be archived instead of removed.
 
 The application has one currency (AFN), so currency is not repeated in each row. Dates are stored as ISO `YYYY-MM-DD` Gregorian dates; the UI converts them to the Afghan Jalali calendar for display.

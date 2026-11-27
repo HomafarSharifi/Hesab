@@ -3,7 +3,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 /// Schema changes are append-only. Increment [currentVersion] and add a
 /// migration case whenever the persisted schema changes.
 abstract final class HesabMigrations {
-  static const currentVersion = 5;
+  static const currentVersion = 6;
 
   static Future<void> onCreate(Database database, int version) =>
       migrate(database, fromVersion: 0, toVersion: version);
@@ -39,6 +39,9 @@ abstract final class HesabMigrations {
           break;
         case 5:
           await _migrateVersion5(database);
+          break;
+        case 6:
+          await _migrateVersion6(database);
           break;
         default:
           throw StateError('No Hesab database migration exists for v$version.');
@@ -118,6 +121,62 @@ abstract final class HesabMigrations {
         ), 0) AS balance_minor
       FROM wallet
     ''');
+  }
+
+  static Future<void> _migrateVersion6(DatabaseExecutor database) async {
+    final duplicateGroups = await database.rawQuery('''
+      SELECT normalized_name, category_id
+      FROM item
+      GROUP BY normalized_name, category_id
+      HAVING COUNT(*) > 1
+    ''');
+
+    if (duplicateGroups.isNotEmpty) {
+      await database.execute('DROP TRIGGER IF EXISTS expense_immutable_update');
+      for (final group in duplicateGroups) {
+        final normalizedName = group['normalized_name']! as String;
+        final categoryId = group['category_id']! as int;
+        final rows = await database.rawQuery(
+          '''
+          SELECT item_id
+          FROM item
+          WHERE normalized_name = ? AND category_id = ?
+          ORDER BY CASE WHEN archived_at IS NULL THEN 0 ELSE 1 END, item_id ASC
+          ''',
+          [normalizedName, categoryId],
+        );
+        final canonicalId = rows.first['item_id']! as int;
+        final duplicateIds = rows
+            .skip(1)
+            .map((row) => row['item_id']! as int)
+            .toList(growable: false);
+        for (final duplicateId in duplicateIds) {
+          await database.update(
+            'expense',
+            {'item_id': canonicalId},
+            where: 'item_id = ?',
+            whereArgs: [duplicateId],
+          );
+          await database.delete(
+            'item',
+            where: 'item_id = ?',
+            whereArgs: [duplicateId],
+          );
+        }
+      }
+      await database.execute('''
+        CREATE TRIGGER expense_immutable_update
+        BEFORE UPDATE ON expense
+        BEGIN
+          SELECT RAISE(ABORT, 'financial_expense_is_immutable');
+        END
+      ''');
+    }
+
+    await database.execute(
+      'CREATE UNIQUE INDEX item_normalized_name_category_idx '
+      'ON item(normalized_name, category_id)',
+    );
   }
 
   static Future<void> _createVersion1(DatabaseExecutor database) async {

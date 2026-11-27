@@ -55,9 +55,8 @@ class CatalogService {
     if (await _repository.itemNameExists(
       normalizedName: normalized,
       categoryId: categoryId,
-      unitId: unitId,
     )) {
-      throw const AppFailure('این جنس با همین دسته‌بندی و واحد ثبت شده است.');
+      throw const AppFailure('این جنس با همین دسته‌بندی ثبت شده است.');
     }
     await _insert(
       () => _repository.createItem(

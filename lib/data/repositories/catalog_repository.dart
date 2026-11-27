@@ -151,7 +151,6 @@ class CatalogRepository {
   Future<ItemRecord?> activeItemByKey({
     required String normalizedName,
     required int categoryId,
-    required int unitId,
   }) async {
     final rows = await _database.rawQuery(
       '''
@@ -160,12 +159,12 @@ class CatalogRepository {
       FROM item i
       JOIN category c ON c.category_id = i.category_id
       JOIN unit u ON u.unit_id = i.unit_id
-      WHERE i.normalized_name = ? AND i.category_id = ? AND i.unit_id = ?
+      WHERE i.normalized_name = ? AND i.category_id = ?
         AND i.archived_at IS NULL AND c.archived_at IS NULL
         AND u.archived_at IS NULL
       LIMIT 1
       ''',
-      [normalizedName, categoryId, unitId],
+      [normalizedName, categoryId],
     );
     return rows.isEmpty ? null : ItemRecord.fromMap(rows.single);
   }
@@ -232,12 +231,12 @@ class CatalogRepository {
     final duplicate = await _database.query(
       'item',
       columns: ['item_id'],
-      where: 'normalized_name = ? AND category_id = ? AND unit_id = ? AND item_id <> ?',
-      whereArgs: [normalizedName, categoryId, unitId, id],
+      where: 'normalized_name = ? AND category_id = ? AND item_id <> ?',
+      whereArgs: [normalizedName, categoryId, id],
       limit: 1,
     );
     if (duplicate.isNotEmpty) {
-      throw const AppFailure('این جنس با همین دسته‌بندی و واحد ثبت شده است.');
+      throw const AppFailure('این جنس با همین دسته‌بندی ثبت شده است.');
     }
     await _database.update(
       'item',
@@ -277,11 +276,10 @@ class CatalogRepository {
   Future<bool> itemNameExists({
     required String normalizedName,
     required int categoryId,
-    required int unitId,
   }) => _exists(
     'item',
-    'normalized_name = ? AND category_id = ? AND unit_id = ?',
-    [normalizedName, categoryId, unitId],
+    'normalized_name = ? AND category_id = ?',
+    [normalizedName, categoryId],
   );
 
   Future<bool> _exists(

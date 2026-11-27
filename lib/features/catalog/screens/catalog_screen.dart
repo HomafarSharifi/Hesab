@@ -35,15 +35,16 @@ class _CatalogScreenState extends State<CatalogScreen> {
         final units = await widget.services.catalog.units();
         if (!mounted) return;
         final result =
-            await showDialog<({String name, int category, int unit})>(
+            await showDialog<({String name, int category})>(
               context: context,
-              builder: (_) => _ItemDialog(categories: categories, units: units),
+              builder: (_) => _ItemDialog(categories: categories),
             );
         if (result != null) {
+          final defaultUnitId = units.isNotEmpty ? units.first.id : 1;
           await widget.services.catalog.createItem(
             name: result.name,
             categoryId: result.category,
-            unitId: result.unit,
+            unitId: defaultUnitId,
           );
         }
       } else {
@@ -137,13 +138,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
   Future<void> _editItem(ItemRecord item) async {
     try {
       final categories = await widget.services.catalog.categories();
-      final units = await widget.services.catalog.units();
       if (!mounted) return;
-      final result = await showDialog<({String name, int category, int unit})>(
+      final result = await showDialog<({String name, int category})>(
         context: context,
         builder: (_) => _ItemDialog(
           categories: categories,
-          units: units,
           initialItem: item,
         ),
       );
@@ -152,7 +151,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
         id: item.id,
         name: result.name,
         categoryId: result.category,
-        unitId: result.unit,
+        unitId: item.unitId,
       );
       if (mounted) setState(() => _revision++);
     } catch (error) {
@@ -404,11 +403,9 @@ class _NameDialogState extends State<_NameDialog> {
 class _ItemDialog extends StatefulWidget {
   const _ItemDialog({
     required this.categories,
-    required this.units,
     this.initialItem,
   });
   final List<CategoryRecord> categories;
-  final List<UnitRecord> units;
   final ItemRecord? initialItem;
   @override
   State<_ItemDialog> createState() => _ItemDialogState();
@@ -419,13 +416,11 @@ class _ItemDialogState extends State<_ItemDialog> {
     text: widget.initialItem?.name ?? '',
   );
   int? _category;
-  int? _unit;
 
   @override
   void initState() {
     super.initState();
     _category = widget.initialItem?.categoryId;
-    _unit = widget.initialItem?.unitId;
   }
 
   @override
@@ -461,18 +456,6 @@ class _ItemDialogState extends State<_ItemDialog> {
                 .toList(),
             onChanged: (v) => setState(() => _category = v),
           ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            initialValue: _unit,
-            decoration: const InputDecoration(
-              labelText: 'واحد',
-              border: OutlineInputBorder(),
-            ),
-            items: widget.units
-                .map((e) => DropdownMenuItem(value: e.id, child: Text(e.name)))
-                .toList(),
-            onChanged: (v) => setState(() => _unit = v),
-          ),
         ],
       ),
     ),
@@ -483,12 +466,11 @@ class _ItemDialogState extends State<_ItemDialog> {
       ),
       FilledButton(
         onPressed:
-            _category == null || _unit == null || _name.text.trim().isEmpty
+            _category == null || _name.text.trim().isEmpty
             ? null
             : () => Navigator.pop(context, (
                 name: _name.text,
                 category: _category!,
-                unit: _unit!,
               )),
         child: const Text('ثبت'),
       ),

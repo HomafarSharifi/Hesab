@@ -196,7 +196,6 @@ class TransactionService {
       final existing = await catalog.activeItemByKey(
         normalizedName: normalizedName,
         categoryId: resolvedCategoryId,
-        unitId: resolvedUnitId,
       );
       final int resolvedItemId;
       if (existing != null) {
@@ -205,7 +204,6 @@ class TransactionService {
         if (await catalog.itemNameExists(
           normalizedName: normalizedName,
           categoryId: resolvedCategoryId,
-          unitId: resolvedUnitId,
         )) {
           throw const AppFailure(
             'جنس هم‌نام در بایگانی موجود است؛ جنس دیگری انتخاب کنید.',
@@ -290,7 +288,6 @@ class TransactionService {
       final existing = await catalog.activeItemByKey(
         normalizedName: normalizedName,
         categoryId: resolvedCategoryId,
-        unitId: resolvedUnitId,
       );
       final int resolvedItemId;
       if (existing != null) {
@@ -299,7 +296,6 @@ class TransactionService {
         if (await catalog.itemNameExists(
           normalizedName: normalizedName,
           categoryId: resolvedCategoryId,
-          unitId: resolvedUnitId,
         )) {
           throw const AppFailure(
             'جنس هم‌نام در بایگانی موجود است؛ جنس دیگری انتخاب کنید.',

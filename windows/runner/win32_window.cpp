@@ -4,7 +4,6 @@
 #include <dwmapi.h>
 #include <flutter_windows.h>
 #include <windowsx.h>
-
 #include <algorithm>
 
 #include "resource.h"
