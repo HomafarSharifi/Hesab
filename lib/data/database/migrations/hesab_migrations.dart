@@ -174,7 +174,7 @@ abstract final class HesabMigrations {
     }
 
     await database.execute(
-      'CREATE UNIQUE INDEX item_normalized_name_category_idx '
+      'CREATE UNIQUE INDEX IF NOT EXISTS item_normalized_name_category_idx '
       'ON item(normalized_name, category_id)',
     );
   }
